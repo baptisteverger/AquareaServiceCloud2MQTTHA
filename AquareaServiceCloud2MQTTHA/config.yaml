@@ -1,5 +1,5 @@
 name: "AquareaServiceCloud2MQTTHA"
-version: "1.0.0"
+version: "1.0.1"
 slug: "aquareaservicecloud2mqqtha"
 description: "Panasonic Aquarea Service Cloud to MQTT gateway (Python port)"
 url: "https://github.com/baptisteverger/AquareaServiceCloud2MQTTHA"
@@ -13,7 +13,7 @@ startup: application
 boot: auto
 init: false
 options:
-  AquareaServiceCloudURL: "https://aquarea-smart.panasonic.com/"
+  AquareaServiceCloudURL: "https://aquarea-service.panasonic.com/"
   AquareaServiceCloudLogin: ""
   AquareaServiceCloudPassword: ""
   AquareaTimeout: "30"
