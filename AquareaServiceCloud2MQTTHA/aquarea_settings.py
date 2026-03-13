@@ -118,7 +118,4 @@ class AquareaSettingsMixin:
             if value is not None:
                 settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
 
-        # DEBUG TEMPORAIRE
-        for k, v in settings.items():
-            logger.info("[DEBUG SETTINGS] %s = %s", k, v)
         return settings
