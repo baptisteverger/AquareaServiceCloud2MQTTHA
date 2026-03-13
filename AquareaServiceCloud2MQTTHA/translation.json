@@ -89,6 +89,15 @@
     "function-status-text-068": {
         "name":  "TankHeaterOperatingTime"
     },
+    "function-status-text-123": {
+        "name": "CirculationDHW"
+    },
+    "function-status-text-124": {
+        "name": "WaterPressure"
+    },
+    "function-status-text-126": {
+        "name": "Zone2PumpSpeed"
+    },
     "function-setting-user-select-003": {
         "name": "Operation",
         "kind": "basic",
