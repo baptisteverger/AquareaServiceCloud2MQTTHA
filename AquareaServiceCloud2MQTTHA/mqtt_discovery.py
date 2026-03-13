@@ -161,7 +161,7 @@ class AquareaDiscoveryMixin:
             suffix = "Live" if is_live else "Log"
             
             # 1. CRÉATION D'UN NOM D'AFFICHAGE (pour l'UI Home Assistant)
-            display_name = f"{name} {suffix}" # "Zone2WaterTemperature Log"
+            display_name = f"{name}{suffix}" # "Zone2WaterTemperature Log"
             
             # 2. CRÉATION D'UN OBJECT_ID VALIDE (pour le TOPIC MQTT)
             # On remplace TOUT ce qui n'est pas alphanumérique par un underscore
