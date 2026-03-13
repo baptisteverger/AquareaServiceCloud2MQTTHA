@@ -125,12 +125,14 @@ class AquareaDiscoveryMixin:
         return config
 
     def encode_sensors(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
+        import re
         config: dict[str, str] = {}
         no_dupes: dict[str, str] = {}
         
-        # LOGIQUE DE FILTRAGE (Indispensable)
+        # 1. Filtrage des doublons
         for k, v in topics.items():
-            if "/log/" not in k and "/state/" not in k: continue
+            if "/log/" not in k and "/state/" not in k:
+                continue
             if k.endswith("/unit"):
                 no_dupes[k] = v
             elif f"{k}/unit" not in topics:
@@ -142,13 +144,17 @@ class AquareaDiscoveryMixin:
             
             is_live = "/state/" in k
             suffix = "Live" if is_live else "Log"
-            display_name = f"{name}{suffix}"
             
-            # Sécurisation du topic (remplace espaces par underscores)
-            safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
-            object_id = f"{safe_name}_{suffix.lower()}"
+            # Nom d'affichage pour l'interface (les espaces sont OK ici)
+            display_name = f"{name} {suffix}"
+            
+            # 2. NETTOYAGE RIGOUREUX DU TOPIC (Suppression de TOUS les espaces)
+            # On crée un ID technique sans aucun caractère spécial
+            clean_name = re.sub(r'[^a-zA-Z0-9_-]', '', name)
+            object_id = f"{clean_name}_{suffix.lower()}" 
 
             try:
+                # On appelle les fonctions de base pour obtenir le JSON
                 if k.endswith("/unit"):
                     _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
                 elif v in ("On", "Off"):
@@ -156,14 +162,18 @@ class AquareaDiscoveryMixin:
                 else:
                     _, ha_data = encode_sensor(display_name, device_id, k)
 
+                # 3. MISE À JOUR DU JSON POUR CORRIGER LES IDS
                 data_dict = json.loads(ha_data)
                 data_dict["unique_id"] = f"{device_id}_{object_id}"
                 data_dict["name"] = display_name 
                 
+                # 4. CONSTRUCTION DU TOPIC (Le point critique)
                 component = "binary_sensor" if v in ("On", "Off") else "sensor"
-                # CONSTRUCTION DU TOPIC SANS ESPACES
-                ha_topic = f"homeassistant/{component}/{device_id}/{object_id}/config"
+                # On s'assure une dernière fois qu'il n'y a pas d'espace dans le ha_topic
+                ha_topic = f"homeassistant/{component}/{device_id}/{object_id}/config".replace(" ", "")
                 
                 config[ha_topic] = json.dumps(data_dict)
-            except Exception: pass
+                
+            except Exception as e:
+                pass
         return config
