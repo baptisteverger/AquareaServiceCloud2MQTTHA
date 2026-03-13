@@ -161,14 +161,13 @@ class AquareaDiscoveryMixin:
             parts = k.split("/")
             name, device_id = parts[3], parts[1]
             
-            # 1. On définit le nom d'affichage (avec espaces, autorisé par HA)
+            # 1. On définit le suffixe et le nom d'affichage
             is_live = "/state/" in k
             display_name = f"{name} Live" if is_live else f"{name} Log"
-            
-            # 2. On définit le suffixe technique (SANS ESPACE pour le topic MQTT)
-            id_suffix = "_live" if is_live else "_log"
+            uid_suffix = "_live" if is_live else "_log"
 
             try:
+                # 2. On appelle les fonctions d'encodage
                 if k.endswith("/unit"):
                     ha_topic, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
                 elif v in ("On", "Off"):
@@ -176,18 +175,22 @@ class AquareaDiscoveryMixin:
                 else:
                     ha_topic, ha_data = encode_sensor(display_name, device_id, k)
 
-                # 3. On force les valeurs dans le JSON
+                # 3. On INTERCEPTE le JSON pour s'assurer que les données sont correctes
                 data_dict = json.loads(ha_data)
-                data_dict["name"] = display_name
-                data_dict["unique_id"] = f"{device_id}_{name}{id_suffix}"
+                data_dict["name"] = display_name  # Nom propre avec espace pour HA
+                data_dict["unique_id"] = f"{device_id}_{name.replace(' ', '_')}{uid_suffix}"
                 
-                # 4. LA CORRECTION : On remplace les espaces par des underscores dans le TOPIC uniquement
-                # On transforme "TankMode Log" en "TankMode_log" pour l'URL MQTT
-                safe_name = name.replace(" ", "_")
-                new_ha_topic = ha_topic.replace(f"/{name}/", f"/{safe_name}{id_suffix}/")
+                # 4. LA CORRECTION CRUCIALE : Nettoyer le topic MQTT
+                # On remplace les espaces par des underscores dans le nom pour le topic uniquement
+                safe_name_for_topic = name.replace(" ", "_")
+                # On reconstruit le topic sans espaces
+                # Exemple : homeassistant/sensor/ID/TankMode_Log/config
+                clean_ha_topic = f"homeassistant/{parts[2]}/{device_id}/{safe_name_for_topic}{uid_suffix}/config"
                 
-                config[new_ha_topic] = json.dumps(data_dict)
+                config[clean_ha_topic] = json.dumps(data_dict)
+                
             except Exception as e:
+                # logger.error(f"Erreur sur {name}: {e}")
                 pass
 
         return config
