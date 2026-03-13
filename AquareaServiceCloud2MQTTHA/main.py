@@ -43,6 +43,7 @@ async def main():
     logger.info("Tentative de lecture de la configuration...") # NEW
     try:
         config = read_config()
+        logger.info(config)
         logger.info("Configuration lue avec succès") # NEW
     except Exception as e:
         logger.error("Erreur critique lors de la lecture du JSON : %s", e) # NEW
