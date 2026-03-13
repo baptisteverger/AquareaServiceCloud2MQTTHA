@@ -64,14 +64,11 @@ async def main():
     )
     logger.info(mqtt_task)
     logger.info("Lancement de la tâche Aquarea...") # NEW
-    aquarea_task = asyncio.create_task(
-        aquarea_handler(stop_event, config, data_queue, command_queue, status_queue),
-        name="aquarea"
-    )
+
 
     logger.info("Tâches lancées, attente du gather...") # NEW
     try:
-        await asyncio.gather(mqtt_task, aquarea_task)
+        await asyncio.gather(mqtt_task)
     except Exception as e:
         logger.exception("Erreur dans la boucle principale : %s", e) # NEW
 
