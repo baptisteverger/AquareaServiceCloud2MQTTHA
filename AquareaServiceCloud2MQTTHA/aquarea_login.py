@@ -47,22 +47,25 @@ class AquareaLoginMixin:
             try:
                 settings = await self.get_device_settings(user, shiesuahruefutohkun)
                 ha_config = self.encode_switches(settings, user)
-                await self.data_queue.put(ha_config)
+                if ha_config:
+                    await self.data_queue.put(ha_config)
             except Exception as e:
-                logger.error("%s", e)
+                logger.error("Error fetching settings: %s", e)
 
+            
             try:
                 await self.parse_device_status(user, shiesuahruefutohkun)
             except Exception as e:
-                logger.error("%s", e)
+                logger.error("Error parsing status: %s", e)
 
             try:
                 log_settings = await self.get_device_log_information(user, shiesuahruefutohkun)
                 if log_settings:
                     ha_config = self.encode_sensors(log_settings, user)
-                    await self.data_queue.put(ha_config)
+                    if ha_config:
+                        await self.data_queue.put(ha_config)
             except Exception as e:
-                logger.error("%s", e)
+                logger.error("Error fetching logs: %s", e)
 
     async def aquarea_login(self):
         shiesuahruefutohkun = await self.get_shiesuahruefutohkun(

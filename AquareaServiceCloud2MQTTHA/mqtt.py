@@ -5,16 +5,13 @@ Requires: pip install aiomqtt
 
 import asyncio
 import logging
-
 import aiomqtt
-
 from aquarea_types import AquareaCommand
 
 logger = logging.getLogger(__name__)
 
 SUBSCRIBE_TOPIC = "aquarea/+/settings/+/set"
 STATUS_TOPIC = "aquarea/status"
-
 
 async def mqtt_handler(
     ctx: asyncio.Event,
@@ -39,7 +36,6 @@ async def mqtt_handler(
     ) as client:
         logger.info("MQTT connected")
         await client.subscribe(SUBSCRIBE_TOPIC, qos=2)
-        # offline until Service Cloud connects
         await client.publish(STATUS_TOPIC, "offline", qos=0, retain=True)
 
         async def read_incoming():
@@ -49,13 +45,9 @@ async def mqtt_handler(
                     device_id = parts[1]
                     setting = parts[3]
                     value = msg.payload.decode()
-                    logger.info(
-                        "Received: Device ID %s setting: %s", device_id, setting
-                    )
+                    logger.info("Received: Device ID %s setting: %s", device_id, setting)
                     await command_queue.put(
-                        AquareaCommand(
-                            device_id=device_id, setting=setting, value=value
-                        )
+                        AquareaCommand(device_id=device_id, setting=setting, value=value)
                     )
 
         async def dispatch_outgoing():
@@ -63,10 +55,22 @@ async def mqtt_handler(
                 # Drain data queue
                 try:
                     while True:
-                        data: dict[str, str] = data_queue.get_nowait()
-                        for key, value in data.items():
+                        data = data_queue.get_nowait()
+                        
+
+                        if data is None:
+                            logger.warning("Data queue a reçu 'None', on ignore pour éviter le crash.")
+                            continue
                             
+                        if not isinstance(data, dict):
+                            logger.error(f"Format de donnée invalide reçu: {type(data)}")
+                            continue
+                        # -----------------------------------------------------------
+
+                        for key, value in data.items():
+
                             await client.publish(key, value, qos=0, retain=True)
+                            
                 except asyncio.QueueEmpty:
                     pass
 
@@ -75,15 +79,12 @@ async def mqtt_handler(
                     while True:
                         online: bool = status_queue.get_nowait()
                         status = "online" if online else "offline"
-                        await client.publish(
-                            STATUS_TOPIC, status, qos=0, retain=True
-                        )
+                        await client.publish(STATUS_TOPIC, status, qos=0, retain=True)
                 except asyncio.QueueEmpty:
                     pass
 
                 await asyncio.sleep(0.01)
 
-            # Set offline on shutdown
             await client.publish(STATUS_TOPIC, "offline", qos=0, retain=True)
 
         await asyncio.gather(read_incoming(), dispatch_outgoing())
