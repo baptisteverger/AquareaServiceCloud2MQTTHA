@@ -1,6 +1,6 @@
-name: "Aquarea2MQTT"
+name: "AquareaServiceCloud2MQTT_HA"
 version: "1.0.0"
-slug: "aquarea2mqtt"
+slug: "AquareaServiceCloud2MQTT_HA"
 description: "Panasonic Aquarea Service Cloud to MQTT gateway (Python port)"
 url: "https://github.com/baptisteverger/AquareaServiceCloud2MQTTHA"
 arch:
