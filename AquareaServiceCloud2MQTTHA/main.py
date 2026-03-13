@@ -41,7 +41,7 @@ def read_config() -> dict:
 async def main():
     config = read_config()
 
-    data_queue: asyncio.Queue = asyncio.Queue(maxsize=10)
+    data_queue: asyncio.Queue = asyncio.Queue(maxsize=200)
     command_queue: asyncio.Queue = asyncio.Queue(maxsize=10)
     status_queue: asyncio.Queue = asyncio.Queue()
 
