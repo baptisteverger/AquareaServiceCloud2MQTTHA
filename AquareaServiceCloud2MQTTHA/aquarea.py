@@ -152,7 +152,7 @@ async def aquarea_handler(
 
     logger.info("Attempting to log in to Aquarea Service Cloud")
     while not await aq.aquarea_setup():
-        pass
+        await asyncio.sleep(5)
     logger.info("Logged in to Aquarea Service Cloud")
 
     async def poll_loop():
