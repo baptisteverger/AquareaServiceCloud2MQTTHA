@@ -159,38 +159,41 @@ class AquareaDiscoveryMixin:
 
         for k, v in no_dupes.items():
             parts = k.split("/")
+            # parts[1] = device_id, parts[2] = component (log/state), parts[3] = name
             name, device_id = parts[3], parts[1]
             
-            # 1. On définit le suffixe et le nom d'affichage
+            # 1. Préparation des variables
             is_live = "/state/" in k
             display_name = f"{name} Live" if is_live else f"{name} Log"
-            uid_suffix = "_live" if is_live else "_log"
+            suffix = "live" if is_live else "log"
+
+            # 2. Création d'un Object ID "propre" pour le TOPIC (sans espaces)
+            # On remplace les espaces par des underscores et on ajoute le suffixe
+            safe_object_id = f"{name.replace(' ', '_')}_{suffix}"
 
             try:
-                # 2. On appelle les fonctions d'encodage
+                # 3. Génération du JSON via les fonctions existantes
+                # Note: on passe display_name pour que le 'name' interne soit joli
                 if k.endswith("/unit"):
-                    ha_topic, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
+                    _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
                 elif v in ("On", "Off"):
-                    ha_topic, ha_data = encode_binary_sensor(display_name, device_id, k)
+                    _, ha_data = encode_binary_sensor(display_name, device_id, k)
                 else:
-                    ha_topic, ha_data = encode_sensor(display_name, device_id, k)
+                    _, ha_data = encode_sensor(display_name, device_id, k)
 
-                # 3. On INTERCEPTE le JSON pour s'assurer que les données sont correctes
+                # 4. Ajustement final du JSON pour garantir l'unicité
                 data_dict = json.loads(ha_data)
-                data_dict["name"] = display_name  # Nom propre avec espace pour HA
-                data_dict["unique_id"] = f"{device_id}_{name.replace(' ', '_')}{uid_suffix}"
+                data_dict["unique_id"] = f"{device_id}_{safe_object_id}"
                 
-                # 4. LA CORRECTION CRUCIALE : Nettoyer le topic MQTT
-                # On remplace les espaces par des underscores dans le nom pour le topic uniquement
-                safe_name_for_topic = name.replace(" ", "_")
-                # On reconstruit le topic sans espaces
-                # Exemple : homeassistant/sensor/ID/TankMode_Log/config
-                clean_ha_topic = f"homeassistant/{parts[2]}/{device_id}/{safe_name_for_topic}{uid_suffix}/config"
+                # 5. CONSTRUCTION DU TOPIC (Format strict HA)
+                # <prefix>/<component>/<device_id>/<object_id>/config
+                component = "binary_sensor" if v in ("On", "Off") else "sensor"
+                ha_topic = f"homeassistant/{component}/{device_id}/{safe_object_id}/config"
                 
-                config[clean_ha_topic] = json.dumps(data_dict)
+                config[ha_topic] = json.dumps(data_dict)
                 
             except Exception as e:
-                # logger.error(f"Erreur sur {name}: {e}")
+                # logger.error(f"Erreur encodage {name}: {e}")
                 pass
 
         return config
