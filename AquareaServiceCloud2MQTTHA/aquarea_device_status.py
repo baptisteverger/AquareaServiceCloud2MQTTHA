@@ -28,8 +28,7 @@ class AquareaDeviceStatusMixin:
             else:
                 value = ""
 
-            # DEBUG TEMPORAIRE
-            logger.info("[DEBUG STATUS] %s = %s", name, value)
+        
 
             device_status[f"aquarea/{user.gwid}/state/{name}"] = value
 
