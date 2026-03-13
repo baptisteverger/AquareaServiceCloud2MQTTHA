@@ -38,40 +38,30 @@ def read_config() -> dict:
     return json.loads(Path(config_file).read_text(encoding="utf-8"))
 
 
-
 async def main():
-    logger.info("Tentative de lecture de la configuration...") # NEW
-    try:
-        config = read_config()
-        logger.info(config)
-        logger.info("Configuration lue avec succès") # NEW
-    except Exception as e:
-        logger.error("Erreur critique lors de la lecture du JSON : %s", e) # NEW
-        return
+    config = read_config()
 
     data_queue: asyncio.Queue = asyncio.Queue(maxsize=200)
     command_queue: asyncio.Queue = asyncio.Queue(maxsize=10)
     status_queue: asyncio.Queue = asyncio.Queue()
 
     stop_event = asyncio.Event()
-    
-    # On vérifie ce que le script a réellement compris du serveur MQTT
-    logger.info("MQTT Server configuré sur : %s", config.get("MqttServer")) 
 
-    logger.info("Lancement de la tâche MQTT...") # NEW
     mqtt_task = asyncio.create_task(
-        mqtt_handler(stop_event, config, data_queue, command_queue, status_queue),
-        name="mqtt"
+        mqtt_handler(stop_event, config, data_queue, command_queue, status_queue)
     )
-    logger.info(mqtt_task)
-    logger.info("Lancement de la tâche Aquarea...") # NEW
+    aquarea_task = asyncio.create_task(
+        aquarea_handler(stop_event, config, data_queue, command_queue, status_queue)
+    )
 
-
-    logger.info("Tâches lancées, attente du gather...") # NEW
+    logger.info("Running — press Ctrl+C to stop")
     try:
-        await asyncio.gather(mqtt_task)
-    except Exception as e:
-        logger.exception("Erreur dans la boucle principale : %s", e) # NEW
+        await asyncio.gather(mqtt_task, aquarea_task)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
+    finally:
+        stop_event.set()
+        logger.info("Shut down complete")
 
 
 if __name__ == "__main__":
