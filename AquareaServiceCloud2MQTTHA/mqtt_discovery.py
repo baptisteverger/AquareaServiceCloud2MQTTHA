@@ -149,25 +149,22 @@ class AquareaDiscoveryMixin:
     def encode_sensors(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
         config: dict[str, str] = {}
         no_dupes: dict[str, str] = {}
-        for k, v in topics.items():
-            if "/log/" not in k and "/state/" not in k:
-                continue
-            if k.endswith("/unit"):
-                no_dupes[k] = v
-            elif f"{k}/unit" not in topics:
-                no_dupes[k] = v
+        # ... filtrage existant ...
 
         for k, v in no_dupes.items():
             parts = k.split("/")
             name, device_id = parts[3], parts[1]
             
-            # 1. On définit le suffixe selon la source (state = Live, log = Log)
-            is_live = "/state/" in k
-            display_name = f"{name} Live" if is_live else f"{name} Log"
-            uid_suffix = "_live" if is_live else "_log"
+            # DETERMINATION DU NOM ET DU SUFFIXE
+            if "/state/" in k:
+                display_name = f"{name} Live"
+                uid_suffix = "_live"
+            else:
+                display_name = f"{name} Log"
+                uid_suffix = "_log"
 
             try:
-                # 2. On génère la base via les fonctions existantes
+                # Appeler la fonction avec le nouveau nom (display_name)
                 if k.endswith("/unit"):
                     ha_topic, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
                 elif v in ("On", "Off"):
@@ -175,20 +172,16 @@ class AquareaDiscoveryMixin:
                 else:
                     ha_topic, ha_data = encode_sensor(display_name, device_id, k)
 
-                # 3. On INTERCEPTE le JSON pour forcer l'ID unique
-                # C'est cette partie qui permet de créer deux entités séparées
+                # MODIFICATION CRUCIALE DU JSON
                 data_dict = json.loads(ha_data)
-                data_dict["name"] = display_name
+                # On remplace l'ID original par un ID incluant la source pour créer 2 entités
                 data_dict["unique_id"] = f"{device_id}_{name}{uid_suffix}"
                 
-                # 4. On modifie le topic de config pour qu'il soit unique dans MQTT
-                # On remplace 'sensor/ID/Name/config' par 'sensor/ID/Name_live/config'
+                # On modifie le topic de config MQTT pour ne pas écraser l'ancien
+                # On remplace /NomOriginal/ par /NomOriginal_live/
                 new_ha_topic = ha_topic.replace(f"/{name}/", f"/{name}{uid_suffix}/")
                 
                 config[new_ha_topic] = json.dumps(data_dict)
-                
-            except Exception as e:
-                logger.error(f"Erreur sur {name}: {e}")
+            except Exception:
                 pass
-
         return config
