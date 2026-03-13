@@ -3,8 +3,11 @@ Device status — equivalent of aquareaDeviceStatus.go
 """
 
 import json
+import logging
 
 from aquarea_types import AquareaEndUserJSON, AquareaStatusResponseJSON
+
+logger = logging.getLogger(__name__)
 
 
 class AquareaDeviceStatusMixin:
@@ -24,6 +27,10 @@ class AquareaDeviceStatusMixin:
                 value = val.value
             else:
                 value = ""
+
+            # DEBUG TEMPORAIRE
+            if name == "TankWaterSetTemperature":
+                logger.info("[DEBUG] TankWaterSetTemperature = %s (type=%s, raw_text=%s, raw_value=%s)", value, val.type, val.text_value, val.value)
 
             device_status[f"aquarea/{user.gwid}/state/{name}"] = value
 
