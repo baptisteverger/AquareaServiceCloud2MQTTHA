@@ -151,7 +151,7 @@ class AquareaDiscoveryMixin:
 
         no_dupes: dict[str, str] = {}
         for k, v in topics.items():
-            if "/log/" not in k:
+            if "/log/" not in k and "/state/" not in k:
                 continue
             if k.endswith("/unit"):
                 no_dupes[k] = v
