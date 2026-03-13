@@ -2,7 +2,7 @@ name: "Aquarea2MQTT"
 version: "1.0.0"
 slug: "aquarea2mqtt"
 description: "Panasonic Aquarea Service Cloud to MQTT gateway (Python port)"
-url: "https://github.com/baptisteverger/aquarea2mqtt-python"
+url: "https://github.com/baptisteverger/AquareaServiceCloud2MQTTHA"
 arch:
   - aarch64
   - amd64
