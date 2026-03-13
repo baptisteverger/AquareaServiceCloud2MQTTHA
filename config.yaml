@@ -1,0 +1,40 @@
+name: "Aquarea2MQTT"
+version: "1.0.0"
+slug: "aquarea2mqtt"
+description: "Panasonic Aquarea Service Cloud to MQTT gateway (Python port)"
+url: "https://github.com/baptisteverger/aquarea2mqtt-python"
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: application
+boot: auto
+init: false
+options:
+  AquareaServiceCloudURL: "https://aquarea-smart.panasonic.com/"
+  AquareaServiceCloudLogin: ""
+  AquareaServiceCloudPassword: ""
+  AquareaTimeout: "30"
+  PoolInterval: "60"
+  LogSecOffset: 3600
+  MqttServer: ""
+  MqttPort: 1883
+  MqttLogin: ""
+  MqttPass: ""
+  MqttClientID: "aquarea"
+  MqttKeepalive: "60"
+schema:
+  AquareaServiceCloudURL: str
+  AquareaServiceCloudLogin: str
+  AquareaServiceCloudPassword: str
+  AquareaTimeout: str
+  PoolInterval: str
+  LogSecOffset: int
+  MqttServer: str
+  MqttPort: int
+  MqttLogin: str
+  MqttPass: str
+  MqttClientID: str
+  MqttKeepalive: str
