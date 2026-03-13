@@ -99,4 +99,8 @@ async def mqtt_handler(
             # Set offline on shutdown
             await client.publish(STATUS_TOPIC, "offline", qos=0, retain=True)
 
-        await asyncio.gather(read_incoming(), dispatch_outgoing())
+        try:
+            await asyncio.gather(read_incoming(), dispatch_outgoing())
+        except Exception as e:
+            logger.exception("MQTT gather failed: %s", e)
+            raise
