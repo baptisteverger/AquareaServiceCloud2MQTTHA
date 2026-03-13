@@ -149,8 +149,6 @@ class AquareaDiscoveryMixin:
     def encode_sensors(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
         config: dict[str, str] = {}
         no_dupes: dict[str, str] = {}
-        
-        # 1. On filtre les topics intéressants
         for k, v in topics.items():
             if "/log/" not in k and "/state/" not in k:
                 continue
@@ -159,24 +157,20 @@ class AquareaDiscoveryMixin:
             elif f"{k}/unit" not in topics:
                 no_dupes[k] = v
 
-        # 2. On génère la config pour chaque capteur
         for k, v in no_dupes.items():
             parts = k.split("/")
             name, device_id = parts[3], parts[1]
             
-            # --- TA MODIFICATION : DIFFÉRENCIATION PAR NOM ---
-            display_name = name
-            uid_suffix = ""
+            # 1. On détermine le nom d'affichage et le suffixe d'ID
             if "/state/" in k:
                 display_name = f"{name} Live"
                 uid_suffix = "_live"
-            elif "/log/" in k:
+            else:
                 display_name = f"{name} Log"
                 uid_suffix = "_log"
-            # --------------------------------------------------
 
             try:
-                # On prépare l'appel à encode_sensor ou encode_binary_sensor
+                # 2. On appelle les fonctions d'encodage avec le NOUVEAU nom (display_name)
                 if k.endswith("/unit"):
                     ha_topic, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
                 elif v in ("On", "Off"):
@@ -184,17 +178,16 @@ class AquareaDiscoveryMixin:
                 else:
                     ha_topic, ha_data = encode_sensor(display_name, device_id, k)
 
-                # --- SÉCURITÉ UNIQUE_ID ---
-                # On injecte le suffixe dans le JSON pour éviter les doublons dans HA
+                # 3. CRUCIAL : On rend l'ID et le Topic uniques pour éviter que l'un écrase l'autre
                 data_dict = json.loads(ha_data)
                 data_dict["unique_id"] = f"{device_id}_{name}{uid_suffix}"
                 
-                # Le topic de config HA doit aussi être unique pour ne pas s'écraser
-                ha_topic = ha_topic.replace(name, f"{name}{uid_suffix}")
+                # On ajuste le topic MQTT pour que HA reçoive deux configs différentes
+                new_ha_topic = ha_topic.replace(f"/{name}/", f"/{name}{uid_suffix}/")
                 
-                config[ha_topic] = json.dumps(data_dict)
+                config[new_ha_topic] = json.dumps(data_dict)
             except Exception as e:
-                logger.error(f"Erreur encodage sensor {name}: {e}")
+                logger.error(f"Erreur sur {name}: {e}")
                 pass
 
         return config
