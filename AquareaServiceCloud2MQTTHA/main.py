@@ -62,7 +62,7 @@ async def main():
         mqtt_handler(stop_event, config, data_queue, command_queue, status_queue),
         name="mqtt"
     )
-
+    logger.info(mqtt_task)
     logger.info("Lancement de la tâche Aquarea...") # NEW
     aquarea_task = asyncio.create_task(
         aquarea_handler(stop_event, config, data_queue, command_queue, status_queue),
