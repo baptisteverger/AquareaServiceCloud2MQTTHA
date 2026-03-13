@@ -148,7 +148,6 @@ class AquareaDiscoveryMixin:
 
     def encode_sensors(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
         config: dict[str, str] = {}
-
         no_dupes: dict[str, str] = {}
         for k, v in topics.items():
             if "/log/" not in k and "/state/" not in k:
