@@ -80,7 +80,7 @@ async def mqtt_handler(
                 except asyncio.QueueEmpty:
                     pass
 
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.01)
 
             # Set offline on shutdown
             await client.publish(STATUS_TOPIC, "offline", qos=0, retain=True)
