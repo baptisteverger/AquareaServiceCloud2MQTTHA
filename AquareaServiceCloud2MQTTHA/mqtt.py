@@ -65,6 +65,9 @@ async def mqtt_handler(
                     while True:
                         data: dict[str, str] = data_queue.get_nowait()
                         for key, value in data.items():
+                            # LIGNE À AJOUTER POUR LE LOG
+                            logger.info(f"[MQTT SEND] {key} = {value}")
+                            
                             await client.publish(key, value, qos=0, retain=True)
                 except asyncio.QueueEmpty:
                     pass
@@ -74,6 +77,10 @@ async def mqtt_handler(
                     while True:
                         online: bool = status_queue.get_nowait()
                         status = "online" if online else "offline"
+                        
+                        # LOG POUR LE STATUT
+                        logger.info(f"[MQTT SEND] {STATUS_TOPIC} = {status}")
+                        
                         await client.publish(
                             STATUS_TOPIC, status, qos=0, retain=True
                         )
