@@ -48,10 +48,13 @@ async def main():
     stop_event = asyncio.Event()
     logger.info("MQTT config: %s", config.get("MqttServer"))
     mqtt_task = asyncio.create_task(
-        mqtt_handler(stop_event, config, data_queue, command_queue, status_queue)
+        mqtt_handler(stop_event, config, data_queue, command_queue, status_queue),
+        name="mqtt"
     )
+
     aquarea_task = asyncio.create_task(
-        aquarea_handler(stop_event, config, data_queue, command_queue, status_queue)
+        aquarea_handler(stop_event, config, data_queue, command_queue, status_queue),
+        name="aquarea"
     )
 
     logger.info("Running — press Ctrl+C to stop")
