@@ -146,50 +146,50 @@ class AquareaDiscoveryMixin:
                     pass
         return config
 
-def encode_sensors(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
-    config: dict[str, str] = {}
-    no_dupes: dict[str, str] = {}
-    
-    # ... (votre logique de filtrage reste la même) ...
-
-    for k, v in no_dupes.items():
-        parts = k.split("/")
-        # parts[1] = device_id, parts[3] = name
-        name, device_id = parts[3], parts[1]
+    def encode_sensors(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
+        config: dict[str, str] = {}
+        no_dupes: dict[str, str] = {}
         
-        is_live = "/state/" in k
-        suffix = "Live" if is_live else "Log"
-        
-        # 1. CRÉATION D'UN NOM D'AFFICHAGE (pour l'UI Home Assistant)
-        display_name = f"{name} {suffix}" # "Zone2WaterTemperature Log"
-        
-        # 2. CRÉATION D'UN OBJECT_ID VALIDE (pour le TOPIC MQTT)
-        # On remplace TOUT ce qui n'est pas alphanumérique par un underscore
-        import re
-        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
-        object_id = f"{safe_name}_{suffix.lower()}" # "Zone2WaterTemperature_log"
+        # ... (votre logique de filtrage reste la même) ...
 
-        try:
-            # On génère la base via vos fonctions
-            if k.endswith("/unit"):
-                _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
-            elif v in ("On", "Off"):
-                _, ha_data = encode_binary_sensor(display_name, device_id, k)
-            else:
-                _, ha_data = encode_sensor(display_name, device_id, k)
+        for k, v in no_dupes.items():
+            parts = k.split("/")
+            # parts[1] = device_id, parts[3] = name
+            name, device_id = parts[3], parts[1]
+            
+            is_live = "/state/" in k
+            suffix = "Live" if is_live else "Log"
+            
+            # 1. CRÉATION D'UN NOM D'AFFICHAGE (pour l'UI Home Assistant)
+            display_name = f"{name} {suffix}" # "Zone2WaterTemperature Log"
+            
+            # 2. CRÉATION D'UN OBJECT_ID VALIDE (pour le TOPIC MQTT)
+            # On remplace TOUT ce qui n'est pas alphanumérique par un underscore
+            import re
+            safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+            object_id = f"{safe_name}_{suffix.lower()}" # "Zone2WaterTemperature_log"
 
-            # 3. NETTOYAGE DU JSON FINAL
-            data_dict = json.loads(ha_data)
-            # On s'assure que l'ID unique et le nom sont propres
-            data_dict["unique_id"] = f"{device_id}_{object_id}"
-            data_dict["name"] = display_name 
-            
-            # 4. CONSTRUCTION DU TOPIC SANS ESPACES (Crucial)
-            component = "binary_sensor" if v in ("On", "Off") else "sensor"
-            ha_topic = f"homeassistant/{component}/{device_id}/{object_id}/config"
-            
-            config[ha_topic] = json.dumps(data_dict)
-            
-        except Exception:
-            pass
-    return config
+            try:
+                # On génère la base via vos fonctions
+                if k.endswith("/unit"):
+                    _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
+                elif v in ("On", "Off"):
+                    _, ha_data = encode_binary_sensor(display_name, device_id, k)
+                else:
+                    _, ha_data = encode_sensor(display_name, device_id, k)
+
+                # 3. NETTOYAGE DU JSON FINAL
+                data_dict = json.loads(ha_data)
+                # On s'assure que l'ID unique et le nom sont propres
+                data_dict["unique_id"] = f"{device_id}_{object_id}"
+                data_dict["name"] = display_name 
+                
+                # 4. CONSTRUCTION DU TOPIC SANS ESPACES (Crucial)
+                component = "binary_sensor" if v in ("On", "Off") else "sensor"
+                ha_topic = f"homeassistant/{component}/{device_id}/{object_id}/config"
+                
+                config[ha_topic] = json.dumps(data_dict)
+                
+            except Exception:
+                pass
+        return config
