@@ -46,7 +46,7 @@ async def main():
     status_queue: asyncio.Queue = asyncio.Queue()
 
     stop_event = asyncio.Event()
-
+    logger.info("MQTT config: %s", config.get("MqttServer"))
     mqtt_task = asyncio.create_task(
         mqtt_handler(stop_event, config, data_queue, command_queue, status_queue)
     )
