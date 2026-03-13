@@ -24,8 +24,9 @@ async def mqtt_handler(
     status_queue: asyncio.Queue,
 ):
     logger.info("Starting MQTT handler")
-
+    logger.info(f"DEBUG: Tentative de connexion avec User: {config.get('MqttLogin')} sur {config.get('MqttServer')}")
     try:
+        logger.info(f"DEBUG: Tentative de connexion avec User: {config.get('MqttLogin')} sur {config.get('MqttServer')}")
         keepalive = int(float(config.get("MqttKeepalive", 60)))
         logger.info("MQTT connecting to %s:%s", config.get("MqttServer"), config.get("MqttPort", 1883))
 
