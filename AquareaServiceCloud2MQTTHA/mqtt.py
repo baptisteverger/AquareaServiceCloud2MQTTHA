@@ -59,12 +59,21 @@ async def mqtt_handler(
                     )
 
         async def dispatch_outgoing():
+            logger.info("MQTT dispatcher started")
+            logger.info("MQTT queue size: %s", data_queue.qsize())
+
             while not ctx.is_set():
                 # Drain data queue
                 try:
                     while True:
-                        data: dict[str, str] = data_queue.get_nowait()
+                        data = data_queue.get_nowait()
+
+                        if not isinstance(data, dict):
+                            logger.warning("Invalid MQTT payload: %s", data)
+                            continue
+
                         for key, value in data.items():
+
                             logger.info(f"[MQTT SEND] topic={key} payload={value}")
                             await client.publish(key, value, qos=0, retain=True)
                 except asyncio.QueueEmpty:
