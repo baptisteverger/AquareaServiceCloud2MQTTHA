@@ -142,7 +142,7 @@ class AquareaDiscoveryMixin:
             
             is_live = "/state/" in k
             suffix = "Live" if is_live else "Log"
-            display_name = f"{name} {suffix}"
+            display_name = f"{name}{suffix}"
             
             # Sécurisation du topic (remplace espaces par underscores)
             safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
