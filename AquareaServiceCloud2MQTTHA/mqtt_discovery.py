@@ -164,7 +164,7 @@ class AquareaDiscoveryMixin:
             
             # 1. Préparation des variables
             is_live = "/state/" in k
-            display_name = f"{name} Live" if is_live else f"{name} Log"
+            display_name = f"{name}Live" if is_live else f"{name}Log"
             suffix = "live" if is_live else "log"
 
             # 2. Création d'un Object ID "propre" pour le TOPIC (sans espaces)
