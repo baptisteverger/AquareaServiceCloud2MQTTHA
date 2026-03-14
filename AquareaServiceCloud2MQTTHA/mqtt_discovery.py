@@ -4,8 +4,35 @@ MQTT Home Assistant discovery — equivalent of mqttDiscovery.go
 
 import json
 import re
+import os
 from dataclasses import dataclass, field, asdict
 from aquarea_types import AquareaEndUserJSON
+
+# ---------------------------------------------------------------------------
+# Chargement du mapping nom → unité depuis translation.json
+# ---------------------------------------------------------------------------
+_TRANSLATION_PATH = os.path.join(os.path.dirname(__file__), "translation.json")
+
+def _load_unit_map(path: str = _TRANSLATION_PATH) -> dict[str, str]:
+    """
+    Construit un dict { nom_entité: unité } à partir de translation.json.
+    Seules les entrées qui ont un champ "unit" sont incluses.
+    Exemple : {"InletWaterTemperature": "°C", "WaterFlow": "L/min", ...}
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return {}
+    return {
+        v["name"]: v["unit"]
+        for v in data.values()
+        if "name" in v and "unit" in v
+    }
+
+# Chargé une seule fois au démarrage du module
+UNIT_MAP: dict[str, str] = _load_unit_map()
+
 
 @dataclass
 class _Device:
@@ -88,7 +115,6 @@ def encode_sensor(name: str, device_id: str, state_topic: str, unit: str = "") -
     return "", _to_json(s)
 
 def encode_switch(name: str, device_id: str, state_topic: str, values: list[str]) -> tuple[str, str]:
-    # Nettoyage du nom pour l'ID unique
     safe_name = name.replace(" ", "_")
     b = MqttSwitch(
         name=name,
@@ -104,7 +130,7 @@ def encode_switch(name: str, device_id: str, state_topic: str, values: list[str]
         if "On" in v: b.payload_on = v; found = True
         if "Request" in v: b.payload_on = v; found = True
     if not found: raise ValueError("Cannot encode switch")
-    
+
     ha_topic = f"homeassistant/switch/{device_id}/{safe_name}/config"
     return ha_topic, _to_json(b)
 
@@ -125,10 +151,9 @@ class AquareaDiscoveryMixin:
         return config
 
     def encode_sensors(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
-        import re
         config: dict[str, str] = {}
         no_dupes: dict[str, str] = {}
-        
+
         # 1. Filtrage des doublons
         for k, v in topics.items():
             if "/log/" not in k and "/state/" not in k:
@@ -141,39 +166,40 @@ class AquareaDiscoveryMixin:
         for k, v in no_dupes.items():
             parts = k.split("/")
             name, device_id = parts[3], parts[1]
-            
+
             is_live = "/state/" in k
             suffix = "Live" if is_live else "Log"
-            
-            # Nom d'affichage pour l'interface (les espaces sont OK ici)
+
             display_name = f"{name} {suffix}"
-            
-            # 2. NETTOYAGE RIGOUREUX DU TOPIC (Suppression de TOUS les espaces)
-            # On crée un ID technique sans aucun caractère spécial
+
             clean_name = re.sub(r'[^a-zA-Z0-9_-]', '', name)
-            object_id = f"{clean_name}_{suffix.lower()}" 
+            object_id = f"{clean_name}_{suffix.lower()}"
 
             try:
-                # On appelle les fonctions de base pour obtenir le JSON
                 if k.endswith("/unit"):
+                    # L'unité est dans la valeur du topic /unit
                     _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
+
                 elif v in ("On", "Off"):
                     _, ha_data = encode_binary_sensor(display_name, device_id, k)
-                else:
-                    _, ha_data = encode_sensor(display_name, device_id, k)
 
-                # 3. MISE À JOUR DU JSON POUR CORRIGER LES IDS
+                else:
+                    # --- CORRECTIF : résolution de l'unité via translation.json ---
+                    unit = UNIT_MAP.get(name, "")
+                    _, ha_data = encode_sensor(display_name, device_id, k, unit)
+
+                # Mise à jour du JSON pour corriger les IDs
                 data_dict = json.loads(ha_data)
                 data_dict["unique_id"] = f"{device_id}_{object_id}"
-                data_dict["name"] = display_name 
-                
-                # 4. CONSTRUCTION DU TOPIC (Le point critique)
+                data_dict["name"] = display_name
+
+                # Construction du topic HA
                 component = "binary_sensor" if v in ("On", "Off") else "sensor"
-                # On s'assure une dernière fois qu'il n'y a pas d'espace dans le ha_topic
                 ha_topic = f"homeassistant/{component}/{device_id}/{object_id}/config".replace(" ", "")
-                
+
                 config[ha_topic] = json.dumps(data_dict)
-                
-            except Exception as e:
+
+            except Exception:
                 pass
+
         return config

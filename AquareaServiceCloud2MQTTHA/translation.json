@@ -6,46 +6,60 @@
         "name":  "Mode"
     },
     "function-status-text-009": {
-        "name":  "InletWater"
+        "name":  "InletWaterTemperature",
+								"unit":  "°C"
     },
     "function-status-text-011": {
-        "name":  "OutletWater"
+        "name":  "OutletWater",
+								"unit":  "°C"
     },
     "function-status-text-013": {
-        "name":  "Zone1TemperatureActual"
+        "name":  "Zone1TemperatureActual",
+								"unit":  "°C"
     },
     "function-status-text-015": {
-        "name":  "Zone1TemperatureSet"
+        "name":  "Zone1TemperatureSet",
+								"unit":  "°C"
     },
     "function-status-text-017": {
-        "name":  "Zone1WaterTemperature"
+        "name":  "Zone1WaterTemperature",
+								"unit":  "°C"
     },
     "function-status-text-019": {
-        "name":  "Zone2TemperatureActual"
+        "name":  "Zone2TemperatureActual",
+								"unit":  "°C"
     },
     "function-status-text-021": {
-        "name":  "Zone2TemperatureSet"
+        "name":  "Zone2TemperatureSet",
+								"unit":  "°C"
     },
     "function-status-text-023": {
-        "name":  "Zone2WaterTemperature"
+        "name":  "Zone2WaterTemperature",
+								"unit":  "°C"
     },
     "function-status-text-025": {
-        "name":  "DHWTankTemperatureActual"
+        "name":  "DHWTankTemperatureActual",
+								"unit":  "°C"
     },
     "function-status-text-027": {
-        "name":  "DHWTankTemperatureSet"
+        "name":  "DHWTankTemperatureSet",
+								"unit":  "°C"
     },
     "function-status-text-029": {
-        "name":  "BufferTankTemperature"
+        "name":  "BufferTankTemperature",
+								"unit":  "°C"
     },
     "function-status-text-031": {
-        "name":  "OutdoorTemperature"
+        "name":  "OutdoorTemperature",
+								"unit":  "°C"
     },
     "function-status-text-035": {
-        "name":  "WaterFlow"
+        "name":  "WaterFlow",
+								"unit":  "L/min"
     },
     "function-status-text-037": {
-        "name":  "PumpSpeed"
+        "name":  "PumpSpeed",
+								"unit":  "r/min"
     },
     "function-status-text-039": {
         "name":  "ThreeWayValve"
@@ -72,31 +86,38 @@
         "name":  "ErrorStatus"
     },
     "function-status-text-056": {
-        "name":  "CompressorFrequency"
+        "name":  "CompressorFrequency",
+								"unit":  "Hz"
     },
     "function-status-text-058": {
-        "name":  "CompressorOperatingTime"
+        "name":  "CompressorOperatingTime",
+								"unit":  "h"
     },
     "function-status-text-060": {
         "name":  "CompressorNumberOfOperations"
     },
     "function-status-text-063": {
-        "name":  "RoomHeaterCapacity"
+        "name":  "RoomHeaterCapacity",
+								"unit":  "kW"
     },
     "function-status-text-065": {
-        "name":  "RoomHeaterOperatingTime"
+        "name":  "RoomHeaterOperatingTime",
+								"unit":  "h"
     },
     "function-status-text-068": {
-        "name":  "TankHeaterOperatingTime"
+        "name":  "TankHeaterOperatingTime",
+								"unit":  "h"
     },
     "function-status-text-123": {
         "name": "CirculationDHW"
     },
     "function-status-text-124": {
-        "name": "WaterPressure"
+        "name": "WaterPressure",
+								"unit": "bar"
     },
     "function-status-text-126": {
-        "name": "Zone2PumpSpeed"
+        "name": "Zone2PumpSpeed",
+								"unit": "r/min"
     },
     "function-setting-user-select-003": {
         "name": "Operation",
@@ -121,23 +142,28 @@
     },
     "function-setting-user-select-008": {
         "name": "Zone1TargetTemperatureHeat",
-        "kind": "placeholder"
+        "kind": "placeholder",
+								"unit": "°C"
     },
     "function-setting-user-select-009": {
         "name": "Zone2TargetTemperatureHeat",
-        "kind": "placeholder"
+        "kind": "placeholder",
+								"unit": "°C"
     },
     "function-setting-user-select-010": {
         "name": "Zone1TargetTemperatureCool",
-        "kind": "placeholder"
+        "kind": "placeholder",
+								"unit": "°C"
     },
     "function-setting-user-select-011": {
         "name": "Zone2TargetTemperatureCool",
-        "kind": "placeholder"
+        "kind": "placeholder",
+								"unit": "°C"
     },
     "function-setting-user-select-013": {
         "name": "TankTargetTemperature",
-        "kind": "placeholder"
+        "kind": "placeholder",
+								"unit": "°C"
     },
     "function-setting-user-select-015": {
         "name": "ZoneOperationSetting",
