@@ -80,7 +80,7 @@ class Aquarea(
             return self._shiesuahruefutohkun
 
     async def get_end_user_shiesuahruefutohkun(self, user: AquareaEndUserJSON) -> str:
-        """Simplified to use the locked getter."""
+        """Always use the thread-safe getter."""
         return await self.get_token()
     
     async def get_shiesuahruefutohkun(self, url: str = None) -> str:

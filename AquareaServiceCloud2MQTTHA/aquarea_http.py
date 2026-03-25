@@ -17,9 +17,10 @@ HEADERS_BASE = {
 
 
 class AquareaHTTPMixin:
-
-    async def http_post(self, url: str, data: dict | None) -> bytes:
+    async def http_post(self, url: str, data: dict | None, referer: str = None) -> bytes:
         headers = {**HEADERS_BASE, "Content-Type": "application/x-www-form-urlencoded"}
+        if referer:
+            headers["Referer"] = referer
         async with self.session.post(url, data=data or {}, headers=headers) as resp:
             resp.raise_for_status()
             return await resp.read()
