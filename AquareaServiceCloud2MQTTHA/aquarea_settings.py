@@ -65,26 +65,26 @@ class AquareaSettingsMixin:
             },
         )
 
-    async def get_device_settings(
-        self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
-    ) -> dict[str, str]:
-        """Récupère les réglages (consignes, interrupteurs) depuis Panasonic."""
+async def get_device_settings(self, user, shiesuahruefutohkun: str, retry=True) -> dict[str, str]:
         try:
             b = await self.http_post(
                 self.aquarea_service_cloud_url + "/installer/api/function/status",
-                {
-                    "var.deviceId": user.device_id,
-                    "shiesuahruefutohkun": shiesuahruefutohkun,
-                },
+                {"var.deviceId": user.device_id, "shiesuahruefutohkun": shiesuahruefutohkun},
             )
-            
-            # Analyse du JSON pour vérifier les erreurs serveurs
-            logger.info(f"user.device_id: {user.device_id}")
-            logger.info(f"shiesuahruefutohkun:{shiesuahruefutohkun}")
             raw_response = json.loads(b)
-            logger.info(f"raw:{raw_response}")
+
+            # Check for the nested "Session expired" error
+            messages = raw_response.get("message", [])
+            if any(m.get("errorCode") == "3000-0003" for m in messages):
+                if retry:
+                    logger.warning("Token 3000-0003 detected. Retrying with fresh token...")
+                    new_token = await self.get_token(force_refresh=True)
+                    return await self.get_device_settings(user, new_token, retry=False)
+                else:
+                    logger.error("Token refresh failed to resolve 3000-0003.")
+                    return {}
+
             if raw_response.get("errorCode") != 0:
-                logger.error(f"Panasonic a renvoyé l'erreur code {raw_response.get('errorCode')} pour les réglages.")
                 return {}
 
             self.aquarea_settings = AquareaFunctionSettingGetJSON.from_dict(raw_response)

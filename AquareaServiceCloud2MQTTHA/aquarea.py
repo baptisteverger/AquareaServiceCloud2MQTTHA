@@ -54,7 +54,8 @@ class Aquarea(
         self.reverse_translation: dict[str, str] = {}
         self.log_items: list[AquareaLogItem] = []
         self.aquarea_settings: AquareaFunctionSettingGetJSON = AquareaFunctionSettingGetJSON()
-        self._shiesuahruefutohkun: str = ""
+        self._token_lock = asyncio.Lock()
+        self._shiesuahruefutohkun = ""
 
     def load_translations(self, filename: str):
         raw: dict = json.loads(Path(filename).read_text(encoding="utf-8"))
@@ -68,6 +69,20 @@ class Aquarea(
             if "setting-user-select" in key
         }
 
+    async def get_token(self, force_refresh=False) -> str:
+        """Thread-safe token retrieval with automatic refresh."""
+        async with self._token_lock:
+            if self._shiesuahruefutohkun and not force_refresh:
+                return self._shiesuahruefutohkun
+            
+            logger.info("[TOKEN] Requesting fresh token from Panasonic...")
+            self._shiesuahruefutohkun = await self.get_shiesuahruefutohkun()
+            return self._shiesuahruefutohkun
+
+    async def get_end_user_shiesuahruefutohkun(self, user: AquareaEndUserJSON) -> str:
+        """Simplified to use the locked getter."""
+        return await self.get_token()
+    
     async def get_shiesuahruefutohkun(self, url: str = None) -> str:
         """Fetch shiesuahruefutohkun from the new installerState API endpoint."""
         import json as _json
