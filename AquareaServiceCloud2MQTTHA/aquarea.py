@@ -71,10 +71,14 @@ class Aquarea(
     async def get_shiesuahruefutohkun(self, url: str = None) -> str:
         """Fetch shiesuahruefutohkun from the new installerState API endpoint."""
         import json as _json
-        endpoint = self.aquarea_service_cloud_url + "page/api/installerState"
-        logger.info("[TOKEN] Fetching from: %s", endpoint)
+        # Must visit /installer/home first to set Referer
+        home_url = self.aquarea_service_cloud_url + "installer/home"
+        installer_state_url = self.aquarea_service_cloud_url + "page/api/installerState"
+        logger.info("[TOKEN] Visiting installer/home first")
+        await self.http_get(home_url)
+        logger.info("[TOKEN] Fetching installerState with Referer")
         try:
-            body = await self.http_get(endpoint)
+            body = await self.http_get_with_referer(installer_state_url, home_url)
             logger.info("[TOKEN] Response: %s", body[:500])
             data = _json.loads(body)
             token = data.get("shiesuahruefutohkun")
