@@ -28,3 +28,9 @@ class AquareaHTTPMixin:
         async with self.session.get(url, headers=HEADERS_BASE) as resp:
             resp.raise_for_status()
             return await resp.read()
+
+    async def http_get_with_referer(self, url: str, referer: str) -> bytes:
+        headers = {**HEADERS_BASE, "Referer": referer, "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "same-origin"}
+        async with self.session.get(url, headers=headers) as resp:
+            resp.raise_for_status()
+            return await resp.read()
