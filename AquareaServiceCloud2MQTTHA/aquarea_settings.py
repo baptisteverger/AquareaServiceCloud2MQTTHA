@@ -71,7 +71,7 @@ class AquareaSettingsMixin:
         """Récupère les réglages (consignes, interrupteurs) depuis Panasonic."""
         try:
             b = await self.http_post(
-                self.aquarea_service_cloud_url + "/installer/api/function/setting/get",
+                self.aquarea_service_cloud_url + "/installer/api/function/status",
                 {
                     "var.deviceId": user.device_id,
                     "shiesuahruefutohkun": shiesuahruefutohkun,
