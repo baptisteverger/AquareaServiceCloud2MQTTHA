@@ -79,10 +79,10 @@ class AquareaSettingsMixin:
             )
             
             # Analyse du JSON pour vérifier les erreurs serveurs
-            logger.info(f"user.device_id: {user.device_id}")
-            logger.info(f"shiesuahruefutohkun:{shiesuahruefutohkun}")
+            logger.info("user.device_id:", user.device_id)
+            logger.info("shiesuahruefutohkun:",shiesuahruefutohkun)
             raw_response = json.loads(b)
-            logger.info(f"raw:{raw_response}")
+            logger.info("raw:",raw_response)
             if raw_response.get("errorCode") != 0:
                 logger.error(f"Panasonic a renvoyé l'erreur code {raw_response.get('errorCode')} pour les réglages.")
                 return {}
