@@ -70,14 +70,21 @@ class Aquarea(
     async def get_shiesuahruefutohkun(self, url: str = None) -> str:
         """Fetch shiesuahruefutohkun from the new installerState API endpoint."""
         import json as _json
-        body = await self.http_get(
-            self.aquarea_service_cloud_url + "page/api/installerState"
-        )
-        data = _json.loads(body)
-        token = data.get("shiesuahruefutohkun")
-        if not token:
-            raise ValueError("Could not extract shiesuahruefutohkun from installerState")
-        return token
+        endpoint = self.aquarea_service_cloud_url + "page/api/installerState"
+        logger.info("[TOKEN] Fetching from: %s", endpoint)
+        try:
+            body = await self.http_get(endpoint)
+            logger.info("[TOKEN] Response: %s", body[:500])
+            data = _json.loads(body)
+            token = data.get("shiesuahruefutohkun")
+            if not token:
+                logger.error("[TOKEN] No shiesuahruefutohkun in response: %s", data)
+                raise ValueError("Could not extract shiesuahruefutohkun from installerState")
+            logger.info("[TOKEN] Got token: %s", token)
+            return token
+        except _json.JSONDecodeError as e:
+            logger.error("[TOKEN] JSON decode error: %s — body: %s", e, body[:500])
+            raise ValueError(f"Could not parse installerState response: {e}")
 
     async def get_end_user_shiesuahruefutohkun(self, user: AquareaEndUserJSON) -> str:
         """For per-user calls, reuse the same installerState token."""
