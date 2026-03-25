@@ -65,7 +65,7 @@ class AquareaSettingsMixin:
             },
         )
 
-async def get_device_settings(self, user, shiesuahruefutohkun: str, retry=True) -> dict[str, str]:
+    async def get_device_settings(self, user, shiesuahruefutohkun: str, retry=True) -> dict[str, str]:
         try:
             b = await self.http_post(
                 self.aquarea_service_cloud_url + "/installer/api/function/status",
