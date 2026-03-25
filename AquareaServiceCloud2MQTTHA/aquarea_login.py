@@ -65,24 +65,26 @@ class AquareaLoginMixin:
                 logger.error("%s", e)
 
     async def aquarea_login(self):
-        shiesuahruefutohkun = await self.get_shiesuahruefutohkun(
-            self.aquarea_service_cloud_url
-        )
         raw = (self.aquarea_service_cloud_login + self.aquarea_service_cloud_password).encode()
         password_md5 = hashlib.md5(raw).hexdigest()
 
+        # Token not needed for login — pass undefined like the browser does
         b = await self.http_post(
             self.aquarea_service_cloud_url + "installer/api/auth/login",
             {
                 "var.loginId": self.aquarea_service_cloud_login,
                 "var.password": password_md5,
-                "var.inputOmit": "false",
-                "shiesuahruefutohkun": shiesuahruefutohkun,
+                "var.inputOmit": "true",
+                "shiesuahruefutohkun": "undefined",
             },
         )
         login = AquareaLoginJSON.from_dict(json.loads(b))
         if login.error_code != 0:
             raise RuntimeError(f"Aquarea login error code: {login.error_code}")
+        
+        # Now fetch the token — only available after successful login
+        self._shiesuahruefutohkun = await self.get_shiesuahruefutohkun()
+        logger.info("Got shiesuahruefutohkun: %s", self._shiesuahruefutohkun)
 
     async def aquarea_installer_home(self):
         body = await self.http_get(self.aquarea_service_cloud_url + "installer/home")

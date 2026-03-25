@@ -54,6 +54,7 @@ class Aquarea(
         self.reverse_translation: dict[str, str] = {}
         self.log_items: list[AquareaLogItem] = []
         self.aquarea_settings: AquareaFunctionSettingGetJSON = AquareaFunctionSettingGetJSON()
+        self._shiesuahruefutohkun: str = ""
 
     def load_translations(self, filename: str):
         raw: dict = json.loads(Path(filename).read_text(encoding="utf-8"))
@@ -87,7 +88,9 @@ class Aquarea(
             raise ValueError(f"Could not parse installerState response: {e}")
 
     async def get_end_user_shiesuahruefutohkun(self, user: AquareaEndUserJSON) -> str:
-        """For per-user calls, reuse the same installerState token."""
+        """Reuse cached token if available, otherwise fetch fresh one."""
+        if hasattr(self, "_shiesuahruefutohkun") and self._shiesuahruefutohkun:
+            return self._shiesuahruefutohkun
         return await self.get_shiesuahruefutohkun()
 
     @staticmethod
