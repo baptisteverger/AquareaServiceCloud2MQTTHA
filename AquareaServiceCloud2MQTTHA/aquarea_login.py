@@ -65,10 +65,14 @@ class AquareaLoginMixin:
                 logger.error("%s", e)
 
     async def aquarea_login(self):
+        # Step 1: fetch settings to establish session/cookie
+        logger.info("Fetching page/api/settings to establish session")
+        await self.http_get(self.aquarea_service_cloud_url + "page/api/settings")
+
+        # Step 2: login — browser sends shiesuahruefutohkun as undefined
         raw = (self.aquarea_service_cloud_login + self.aquarea_service_cloud_password).encode()
         password_md5 = hashlib.md5(raw).hexdigest()
-
-        # Token not needed for login — pass undefined like the browser does
+        logger.info("Posting login for %s", self.aquarea_service_cloud_login)
         b = await self.http_post(
             self.aquarea_service_cloud_url + "installer/api/auth/login",
             {
@@ -78,11 +82,12 @@ class AquareaLoginMixin:
                 "shiesuahruefutohkun": "undefined",
             },
         )
+        logger.info("Login response: %s", b[:200])
         login = AquareaLoginJSON.from_dict(json.loads(b))
         if login.error_code != 0:
             raise RuntimeError(f"Aquarea login error code: {login.error_code}")
-        
-        # Now fetch the token — only available after successful login
+
+        # Step 3: fetch token — only available after successful login
         self._shiesuahruefutohkun = await self.get_shiesuahruefutohkun()
         logger.info("Got shiesuahruefutohkun: %s", self._shiesuahruefutohkun)
 
