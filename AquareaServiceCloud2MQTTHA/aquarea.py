@@ -67,20 +67,36 @@ class Aquarea(
             if "setting-user-select" in key
         }
 
-    async def get_shiesuahruefutohkun(self, url: str) -> str:
-        body = await self.http_get(url)
-        return self.extract_shiesuahruefutohkun(body)
+    async def get_shiesuahruefutohkun(self, url: str = None) -> str:
+        """Fetch shiesuahruefutohkun from the new installerState API endpoint."""
+        import json as _json
+        body = await self.http_get(
+            self.aquarea_service_cloud_url + "page/api/installerState"
+        )
+        data = _json.loads(body)
+        token = data.get("shiesuahruefutohkun")
+        if not token:
+            raise ValueError("Could not extract shiesuahruefutohkun from installerState")
+        return token
 
     async def get_end_user_shiesuahruefutohkun(self, user: AquareaEndUserJSON) -> str:
-        body = await self.http_post(
-            self.aquarea_service_cloud_url + "/installer/functionUserInformation",
-            {"var.functionSelectedGwUid": user.gw_uid},
-        )
-        return self.extract_shiesuahruefutohkun(body)
+        """For per-user calls, reuse the same installerState token."""
+        return await self.get_shiesuahruefutohkun()
 
     @staticmethod
     def extract_shiesuahruefutohkun(body: bytes) -> str:
-        match = re.search(
+        """Legacy method kept for compatibility."""
+        import re as _re, json as _json
+        # Try new JSON format first
+        try:
+            data = _json.loads(body)
+            token = data.get("shiesuahruefutohkun")
+            if token:
+                return token
+        except Exception:
+            pass
+        # Fall back to old HTML pattern
+        match = _re.search(
             r"const shiesuahruefutohkun = '(.+)'",
             body.decode("utf-8", errors="replace"),
         )

@@ -47,33 +47,22 @@ class AquareaLoginMixin:
             try:
                 settings = await self.get_device_settings(user, shiesuahruefutohkun)
                 ha_config = self.encode_switches(settings, user)
-                # On vérifie que ce n'est pas None avant d'envoyer
-                if ha_config:
-                    await self.data_queue.put(ha_config)
+                await self.data_queue.put(ha_config)
             except Exception as e:
-                logger.error("Erreur settings: %s", e)
+                logger.error("%s", e)
 
             try:
-                # IMPORTANT: parse_device_status renvoie les données 'state' (1 min)
-                status_data = await self.parse_device_status(user, shiesuahruefutohkun)
-                if status_data:
-                    # On crée les entités pour le dossier 'state'
-                    ha_config_state = self.encode_sensors(status_data, user)
-                    if ha_config_state:
-                        await self.data_queue.put(ha_config_state)
-                    # Et on envoie les valeurs
-                    await self.data_queue.put(status_data)
+                await self.parse_device_status(user, shiesuahruefutohkun)
             except Exception as e:
-                logger.error("Erreur status: %s", e)
+                logger.error("%s", e)
 
             try:
                 log_settings = await self.get_device_log_information(user, shiesuahruefutohkun)
                 if log_settings:
                     ha_config = self.encode_sensors(log_settings, user)
-                    if ha_config:
-                        await self.data_queue.put(ha_config)
+                    await self.data_queue.put(ha_config)
             except Exception as e:
-                logger.error("Erreur logs: %s", e)
+                logger.error("%s", e)
 
     async def aquarea_login(self):
         shiesuahruefutohkun = await self.get_shiesuahruefutohkun(
@@ -97,8 +86,8 @@ class AquareaLoginMixin:
 
     async def aquarea_installer_home(self):
         body = await self.http_get(self.aquarea_service_cloud_url + "installer/home")
-        shiesuahruefutohkun = self.extract_shiesuahruefutohkun(body)
         self.extract_dictionary(body)
+        shiesuahruefutohkun = await self.get_shiesuahruefutohkun()
 
         b = await self.http_post(
             self.aquarea_service_cloud_url + "/installer/api/endusers",
