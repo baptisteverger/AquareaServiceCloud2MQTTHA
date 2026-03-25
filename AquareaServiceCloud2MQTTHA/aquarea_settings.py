@@ -66,16 +66,10 @@ class AquareaSettingsMixin:
         )
 
     async def get_device_settings(self, user, shiesuahruefutohkun: str, retry=True) -> dict[str, str]:
-        referer = self.aquarea_service_cloud_url + "installer/functionStatus"
-    
         try:
             b = await self.http_post(
-                self.aquarea_service_cloud_url + "installer/api/function/status",
-                {
-                    "var.deviceId": user.device_id, 
-                    "shiesuahruefutohkun": shiesuahruefutohkun
-                },
-                referer=referer # Crucial for Panasonic session validation
+                self.aquarea_service_cloud_url + "/installer/api/function/status",
+                {"var.deviceId": user.device_id, "shiesuahruefutohkun": shiesuahruefutohkun},
             )
             raw_response = json.loads(b)
 

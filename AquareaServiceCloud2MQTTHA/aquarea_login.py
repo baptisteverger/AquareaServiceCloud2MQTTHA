@@ -20,17 +20,21 @@ logger = logging.getLogger(__name__)
 class AquareaLoginMixin:
 
     async def aquarea_setup(self) -> bool:
+        """Full login sequence. Returns True on success."""
         try:
-            # 1. Login
             await self.aquarea_login()
-            # 2. Visit Home and set up dictionaries
-            await self.aquarea_installer_home() 
-            # 3. Cache the token for the first time
-            self._shiesuahruefutohkun = await self.get_token(force_refresh=True)
-            return True
         except Exception as e:
-            logger.error("Setup failed: %s", e)
+            logger.error("Login failed: %s", e)
             return False
+
+        try:
+            await self.aquarea_installer_home()
+        except Exception as e:
+            logger.error("Installer home failed: %s", e)
+            return False
+
+        await self.aquarea_initial_fetch()
+        return True
 
     async def aquarea_initial_fetch(self):
         """First data fetch and Home Assistant discovery."""
