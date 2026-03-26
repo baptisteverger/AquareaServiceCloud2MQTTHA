@@ -94,7 +94,7 @@ class AquareaLoginMixin:
     async def aquarea_installer_home(self):
         body = await self.http_get(self.aquarea_service_cloud_url + "installer/home")
         self.extract_dictionary(body)
-        shiesuahruefutohkun = await self.get_shiesuahruefutohkun()
+        shiesuahruefutohkun = self._shiesuahruefutohkun
 
         b = await self.http_post(
             self.aquarea_service_cloud_url + "/installer/api/endusers",

@@ -86,6 +86,7 @@ class Aquarea(
                 logger.error("[TOKEN] No shiesuahruefutohkun in response: %s", data)
                 raise ValueError("Could not extract shiesuahruefutohkun from installerState")
             logger.info("[TOKEN] Got token: %s", token)
+            self._shiesuahruefutohkun = token
             return token
         except _json.JSONDecodeError as e:
             logger.error("[TOKEN] JSON decode error: %s — body: %s", e, body[:500])
