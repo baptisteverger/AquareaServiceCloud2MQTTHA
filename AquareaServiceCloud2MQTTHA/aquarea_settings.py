@@ -68,41 +68,22 @@ class AquareaSettingsMixin:
     async def get_device_settings(
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> dict[str, str]:
-        """Récupère les réglages (consignes, interrupteurs) depuis Panasonic."""
-        try:
-            b = await self.http_post(
-                self.aquarea_service_cloud_url + "/installer/api/function/status",
-                {
-                    "var.deviceId": user.device_id,
-                    "shiesuahruefutohkun": shiesuahruefutohkun,
-                },
-            )
-            
-            # Analyse du JSON pour vérifier les erreurs serveurs
-            logger.info("user.device_id:", user.device_id)
-            logger.info("shiesuahruefutohkun:",shiesuahruefutohkun)
-            raw_response = json.loads(b)
-            logger.info("raw:",raw_response)
-            if raw_response.get("errorCode") != 0:
-                logger.error(f"Panasonic a renvoyé l'erreur code {raw_response.get('errorCode')} pour les réglages.")
-                return {}
-
-            self.aquarea_settings = AquareaFunctionSettingGetJSON.from_dict(raw_response)
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de la requête de réglages : {e}")
-            return {}
-
+        b = await self.http_post(
+            self.aquarea_service_cloud_url + "/installer/api/function/setting/get",
+            {
+                "var.deviceId": user.device_id,
+                "shiesuahruefutohkun": shiesuahruefutohkun,
+            },
+        )
+        self.aquarea_settings = AquareaFunctionSettingGetJSON.from_dict(json.loads(b))
         settings: dict[str, str] = {}
 
-        # Parcours des données renvoyées par Panasonic
         for key, val in self.aquarea_settings.setting_data_info.items():
-            # On ne s'intéresse qu'aux réglages utilisateur
             if "user" not in key:
                 continue
 
             if key not in self.translation:
-                logger.warning("Pas de métadonnées dans translation.json pour: %s", key)
+                logger.warning("No metadata in translation.json for: %s", key)
                 continue
 
             translation = self.translation[key]
@@ -125,23 +106,19 @@ class AquareaSettingsMixin:
                     ] = options
 
                 elif translation.kind == "placeholder":
-                    try:
-                        i = int(val.selected_value, 0)
-                        if "HolidayMode" not in translation.name:
-                            i -= 128
-                        # Conversion 8-bit signée
-                        value = str(int.from_bytes((i & 0xFF).to_bytes(1, "big"), "big", signed=True))
-                    except (ValueError, TypeError):
-                        continue
+                    i = int(val.selected_value, 0)
+                    if "HolidayMode" not in translation.name:
+                        i -= 128
+                    # Two's complement signed 8-bit
+                    value = str(int.from_bytes((i & 0xFF).to_bytes(1, "big"), "big", signed=True))
 
             elif val.type == "placeholder-text":
                 value = val.placeholder
 
             if value is not None:
                 settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
-        
-        # Log de diagnostic final
-        if not settings:
-            logger.info(f"Diagnostic : Aucun réglage 'user' trouvé dans la réponse pour {user.device_id}")
-            
+
+        # DEBUG TEMPORAIRE
+        for k, v in settings.items():
+            logger.info("[DEBUG SETTINGS] %s = %s", k, v)
         return settings
