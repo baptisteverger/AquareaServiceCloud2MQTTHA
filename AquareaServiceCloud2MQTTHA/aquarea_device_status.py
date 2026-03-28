@@ -20,7 +20,9 @@ class AquareaDeviceStatusMixin:
  
         for key, val in response.status_data_info.items():
             name = self.translation[key].name if key in self.translation else key
- 
+            if "Zone2" in name:
+                logger.info("Zone2 key=%s type=%s text_value=%r value=%r",
+                            key, val.type, val.text_value, val.value)
             if val.type == "basic-text":
                 # Fallback sur la valeur brute si la traduction est absente
                 # (évite les capteurs "Unknown" dans HA)
@@ -31,7 +33,7 @@ class AquareaDeviceStatusMixin:
                 value = ""
  
             device_status[f"aquarea/{user.gwid}/state/{name}"] = value
- 
+    
         return device_status
  
     async def get_device_status(

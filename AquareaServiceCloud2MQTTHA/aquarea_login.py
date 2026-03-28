@@ -244,7 +244,9 @@ class AquareaLoginMixin:
             self.log_items.append(item)
 
         logger.info("fetch_log_items: built %d log items", len(self.log_items))
-
+        logger.info("LOG ITEMS COUNT: %d", len(self.log_items))
+        if self.log_items:
+            logger.info("LOG ITEMS[0]: %s", self.log_items[0])
     # ------------------------------------------------------------------
     # Méthodes legacy conservées pour compatibilité (plus utilisées)
     # ------------------------------------------------------------------
