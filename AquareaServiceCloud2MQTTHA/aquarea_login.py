@@ -72,9 +72,18 @@ class AquareaLoginMixin:
             try:
                 logger.info("aquarea_initial_fetch: calling get_device_log_information")
                 log_settings = await self.get_device_log_information(user, shiesuahruefutohkun)
-                if log_settings:
+                if log_settings and self.log_items:
+                    # Publish HA discovery only when real names are known.
+                    # If log_items is empty, numeric names (item000…) would clutter HA.
                     ha_config = self.encode_sensors(log_settings, user)
                     await self.data_queue.put(ha_config)
+                elif log_settings and not self.log_items:
+                    logger.warning(
+                        "aquarea_initial_fetch: log schema unknown — "
+                        "skipping HA discovery for log sensors (no item### entities). "
+                        "Raw values still published to aquarea/%s/log/item###", user.gwid
+                    )
+                    await self.data_queue.put(log_settings)
             except Exception as e:
                 logger.error("get_device_log_information/encode_sensors: %s", e)
         logger.info("aquarea_initial_fetch: done")
@@ -192,46 +201,6 @@ class AquareaLoginMixin:
         if match:
             result = match.group(1).replace("\\", "")
             self.dictionary_web_ui.update(json.loads(result))
-
-    async def fetch_log_items(self, user: "AquareaEndUserJSON", shiesuahruefutohkun: str):
-        """Populate self.log_items by navigating to the function-data-log SPA page.
-
-        The old code scraped 'var logItems = $.parseJSON(...)' from a server-rendered
-        HTML page.  The new Next.js SPA still returns the same embedded variable in the
-        HTML shell of installer/function-data-log, so we POST to navigate there (same
-        pattern as functionStatus) then try the old regex.  If the variable is gone in
-        a future update the method logs a warning and leaves log_items untouched so the
-        numeric-fallback in get_device_log_information keeps things running.
-        """
-        base = self.aquarea_service_cloud_url
-        ref = base + "installer/functionStatus"
-
-        logger.info("fetch_log_items: navigating to function-data-log")
-        try:
-            # The SPA page is reached via POST with gwUid, same as functionStatus.
-            body = await self.http_post_navigate(
-                base + "installer/function-data-log",
-                ref,
-                {"var.functionSelectedGwUid": user.gw_uid},
-            )
-        except Exception as e:
-            logger.warning("fetch_log_items: navigation failed (%s), trying plain GET", e)
-            try:
-                body = await self.http_get_html(base + "installer/function-data-log")
-            except Exception as e2:
-                logger.warning("fetch_log_items: plain GET also failed: %s", e2)
-                return
-
-        self.extract_log_items(body)
-
-        if self.log_items:
-            logger.info("fetch_log_items: extracted %d log items from page HTML", len(self.log_items))
-        else:
-            logger.warning(
-                "fetch_log_items: 'var logItems' not found in function-data-log page. "
-                "Log sensors will be published with numeric names (item000, item001, …) "
-                "until a schema source is found."
-            )
 
     def extract_log_items(self, body: bytes):
         match = re.search(
