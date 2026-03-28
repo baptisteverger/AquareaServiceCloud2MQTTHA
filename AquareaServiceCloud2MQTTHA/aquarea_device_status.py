@@ -1,44 +1,44 @@
 """
 Device status — equivalent of aquareaDeviceStatus.go
 """
-
+ 
 import json
 import logging
-
+ 
 from aquarea_types import AquareaEndUserJSON, AquareaStatusResponseJSON
-
+ 
 logger = logging.getLogger(__name__)
-
-
+ 
+ 
 class AquareaDeviceStatusMixin:
-
+ 
     async def parse_device_status(
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> dict[str, str]:
         response = await self.get_device_status(user, shiesuahruefutohkun)
         device_status: dict[str, str] = {}
-
+ 
         for key, val in response.status_data_info.items():
             name = self.translation[key].name if key in self.translation else key
-
+ 
             if val.type == "basic-text":
                 value = self.dictionary_web_ui.get(val.text_value, "")
             elif val.type == "simple-value":
                 value = val.value
             else:
                 value = ""
-
+ 
             device_status[f"aquarea/{user.gwid}/state/{name}"] = value
-
+ 
         return device_status
-
+ 
     async def get_device_status(
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> AquareaStatusResponseJSON:
         base = self.aquarea_service_cloud_url
         ref = base + "installer/functionStatus"
         home_ref = base + "installer/home"
-
+ 
         # Navigate to functionStatus via POST with var.functionSelectedGwUid — exactly
         # as the real browser does (application/x-www-form-urlencoded, Sec-Fetch-Mode: navigate).
         # A plain GET does NOT establish the device context in the server session.
@@ -47,7 +47,7 @@ class AquareaDeviceStatusMixin:
             home_ref,
             {"var.functionSelectedGwUid": user.gw_uid},
         )
-
+ 
         # Reproduce exact browser API calls after navigation
         await self.http_get_with_referer(base + "page/api/installerState", ref)
         await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222006%22%5D", ref)
@@ -55,7 +55,7 @@ class AquareaDeviceStatusMixin:
         await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222000%22%5D", ref)
         await self.http_get_with_referer(base + f"page/api/onetrust?shiesuahruefutohkun={shiesuahruefutohkun}", ref)
         await self.http_get_with_referer(base + f"page/api/userInfo?shiesuahruefutohkun={shiesuahruefutohkun}", ref)
-
+ 
         # POST function/status — activates the device in the server session
         b = await self.http_post_with_referer(
             base + "installer/api/function/status",
