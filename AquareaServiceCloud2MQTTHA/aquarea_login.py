@@ -202,6 +202,46 @@ class AquareaLoginMixin:
             result = match.group(1).replace("\\", "")
             self.dictionary_web_ui.update(json.loads(result))
 
+    async def fetch_log_items(self, user, shiesuahruefutohkun: str):
+        """Populate self.log_items by navigating to the function-data-log SPA page."""
+        base = self.aquarea_service_cloud_url
+        ref = base + "installer/functionStatus"
+
+        logger.info("fetch_log_items: navigating to installer/function-data-log")
+        body = None
+        try:
+            body = await self.http_post_navigate(
+                base + "installer/function-data-log",
+                ref,
+                {"var.functionSelectedGwUid": user.gw_uid},
+            )
+            logger.info("fetch_log_items: POST response length=%d", len(body))
+            logger.info("fetch_log_items: preview: %s", body[:500].decode("utf-8", errors="replace"))
+        except Exception as e:
+            logger.warning("fetch_log_items: POST failed (%s), trying plain GET", e)
+            try:
+                body = await self.http_get_html(base + "installer/function-data-log")
+                logger.info("fetch_log_items: GET response length=%d", len(body))
+                logger.info("fetch_log_items: preview: %s", body[:500].decode("utf-8", errors="replace"))
+            except Exception as e2:
+                logger.warning("fetch_log_items: GET also failed: %s", e2)
+                return
+
+        if not body:
+            return
+
+        body_str = body.decode("utf-8", errors="replace")
+        if "logItems" in body_str:
+            logger.info("fetch_log_items: 'logItems' found — extracting schema")
+            self.extract_log_items(body)
+            logger.info("fetch_log_items: extracted %d log items", len(self.log_items))
+        else:
+            logger.warning(
+                "fetch_log_items: 'logItems' NOT found in page response. "
+                "The SPA no longer embeds log schema in HTML. "
+                "Capture a HAR on installer/function-data-log to find the API endpoint."
+            )
+
     def extract_log_items(self, body: bytes):
         match = re.search(
             r"var logItems = \$\.parseJSON\('(.+)'\);",
