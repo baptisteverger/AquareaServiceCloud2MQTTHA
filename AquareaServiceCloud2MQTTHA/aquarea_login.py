@@ -132,24 +132,27 @@ class AquareaLoginMixin:
         await self.status_queue.put(True)
 
     async def get_dictionary(self, user: AquareaEndUserJSON):
-        """Fetch UI string translations from all sub-pages."""
-        await self.get_end_user_shiesuahruefutohkun(user)
+        token = await self.get_end_user_shiesuahruefutohkun(user)
+        base = self.aquarea_service_cloud_url
 
-        body = await self.http_post(
-            self.aquarea_service_cloud_url + "installer/functionSetting", None
-        )
+        body = await self.http_post(base + "installer/functionSetting", None)
         self.extract_dictionary(body)
-
-        # Build reverse dictionary (needed for changing settings)
         self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
 
-        body = await self.http_post(
-            self.aquarea_service_cloud_url + "installer/functionStatus", None
-        )
+        body = await self.http_post(base + "installer/functionStatus", None)
         self.extract_dictionary(body)
 
-        body = await self.http_post(
-            self.aquarea_service_cloud_url + "installer/functionStatistics", None
+        # Naviguer vers functionStatistics avec le bon device context
+        ref = base + "installer/functionStatus"
+        await self.http_post_navigate(
+            base + "installer/functionStatistics",
+            ref,
+            {"var.functionSelectedGwUid": user.gw_uid},
+        )
+        # Puis fetch la page avec referer correct
+        body = await self.http_get_with_referer(
+            base + "installer/functionStatistics",
+            base + "installer/functionStatistics",
         )
         self.extract_dictionary(body)
         self.extract_log_items(body)
