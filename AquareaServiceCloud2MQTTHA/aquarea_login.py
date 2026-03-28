@@ -16,27 +16,23 @@ from aquarea_types import (
 
 logger = logging.getLogger(__name__)
 
-# Regex pour extraire nom, unité et choix multiples depuis un label type
-# "Opération [1 : Off, 2 : On]" ou "Température [°C]"
 _UNIT_RE = re.compile(r"(.+)\[(.+)\]")
 _MULTI_CHOICE_RE = re.compile(r"(\d+)\s*:\s*([^,\]]+)")
 _REMOVE_PARENS_RE = re.compile(r"\(.+?\)")
 
 
+def _key_to_index(key: str) -> int:
+    """Convertit '2903-01e8' en indice numérique pour var.logItems."""
+    hex_part = key.split("-")[1]
+    return (int(hex_part, 16) - 0x0104) // 4
+
+
 def _parse_log_label(raw_label: str) -> AquareaLogItem:
-    """
-    Transforme un label brut issu de l'API text en AquareaLogItem.
-    Exemples :
-      "Opération [1 : Off, 2 : On]"  → name="Operation", values={"1":"Off","2":"On"}
-      "Température entrée d'eau [°C]" → name="TemperatureEntreeDeau", unit="°C"
-      "Fréquence du compresseur [Hz]" → name="FrequenceduCompresseur", unit="Hz"
-    """
     label = raw_label.replace("(Actual)", "Actual").replace("(Target)", "Target")
     label = _REMOVE_PARENS_RE.sub("", label).strip()
 
     split = _UNIT_RE.search(label)
     if not split:
-        # Pas de crochets — nom simple, pas d'unité
         name = label.strip().title().replace(" ", "").replace(":", "")
         return AquareaLogItem(name=name, unit="", values={})
 
@@ -50,14 +46,12 @@ def _parse_log_label(raw_label: str) -> AquareaLogItem:
             unit="",
             values={m[0]: m[1].strip() for m in choices},
         )
-    else:
-        return AquareaLogItem(name=name_raw, unit=unit_part, values={})
+    return AquareaLogItem(name=name_raw, unit=unit_part, values={})
 
 
 class AquareaLoginMixin:
 
     async def aquarea_setup(self) -> bool:
-        """Full login sequence. Returns True on success."""
         try:
             await self.aquarea_login()
         except Exception as e:
@@ -74,21 +68,19 @@ class AquareaLoginMixin:
         return True
 
     async def aquarea_initial_fetch(self):
-        """First data fetch and Home Assistant discovery."""
+        """First data fetch and Home Assistant discovery.
+
+        IMPORTANT: parse_device_status must run first — it navigates to
+        functionStatus and establishes the device context in the server
+        session.  get_device_settings (functionSetting) must come after.
+        """
         for user in self.users_map.values():
             try:
                 shiesuahruefutohkun = await self.get_end_user_shiesuahruefutohkun(user)
             except Exception:
                 continue
 
-            try:
-                settings = await self.get_device_settings(user, shiesuahruefutohkun)
-                ha_config = self.encode_switches(settings, user)
-                if ha_config:
-                    await self.data_queue.put(ha_config)
-            except Exception as e:
-                logger.error("Erreur settings: %s", e)
-
+            # 1. Status first — establishes session context for this device
             try:
                 status_data = await self.parse_device_status(user, shiesuahruefutohkun)
                 if status_data:
@@ -99,10 +91,20 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.error("Erreur status: %s", e)
 
+            # 2. Settings after — session context now valid
             try:
-                log_settings = await self.get_device_log_information(user, shiesuahruefutohkun)
-                if log_settings:
-                    ha_config = self.encode_sensors(log_settings, user)
+                settings = await self.get_device_settings(user, shiesuahruefutohkun)
+                ha_config = self.encode_switches(settings, user)
+                if ha_config:
+                    await self.data_queue.put(ha_config)
+            except Exception as e:
+                logger.error("Erreur settings: %s", e)
+
+            # 3. Logs
+            try:
+                log_data = await self.get_device_log_information(user, shiesuahruefutohkun)
+                if log_data:
+                    ha_config = self.encode_sensors(log_data, user)
                     if ha_config:
                         await self.data_queue.put(ha_config)
             except Exception as e:
@@ -111,10 +113,8 @@ class AquareaLoginMixin:
     async def aquarea_login(self):
         import json as _json
 
-        # Step 1: establish session cookie
         await self.http_get(self.aquarea_service_cloud_url + "page/api/settings")
 
-        # Step 2: POST login
         raw = (self.aquarea_service_cloud_login + self.aquarea_service_cloud_password).encode()
         password_md5 = hashlib.md5(raw).hexdigest()
         b = await self.http_post(
@@ -130,7 +130,6 @@ class AquareaLoginMixin:
         if login.error_code != 0:
             raise RuntimeError(f"Aquarea login error code: {login.error_code}")
 
-        # Step 3: fetch the real token from installerState
         await self.http_get(self.aquarea_service_cloud_url + "installer/home")
         home_url = self.aquarea_service_cloud_url + "installer/home"
         installer_state_url = self.aquarea_service_cloud_url + "page/api/installerState"
@@ -164,12 +163,10 @@ class AquareaLoginMixin:
         await self.status_queue.put(True)
 
     async def get_dictionary(self, user: AquareaEndUserJSON):
-        """Fetch UI string translations and build log item schema via JSON APIs."""
         token = self._shiesuahruefutohkun
         base = self.aquarea_service_cloud_url
         home_ref = base + "installer/home"
 
-        # 1. Dictionnaire UI général (types 2000, 2006, 2999)
         for type_code in ["2000", "2006", "2999"]:
             try:
                 body = await self.http_get_with_referer(
@@ -182,7 +179,7 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.warning("get_dictionary type %s: %s", type_code, e)
 
-        # 2. Dictionnaire des labels de log (type 2903)
+        log_labels_2903: dict[str, str] = {}
         try:
             body = await self.http_get_with_referer(
                 base + "page/api/text?var.types=%5B%222903%22%5D",
@@ -190,25 +187,16 @@ class AquareaLoginMixin:
             )
             data = json.loads(body)
             if data.get("errorCode", -1) == 0:
-                self.dictionary_web_ui.update(data.get("text", {}))
-                log_labels_2903: dict[str, str] = data.get("text", {})
-            else:
-                log_labels_2903 = {}
+                log_labels_2903 = data.get("text", {})
+                self.dictionary_web_ui.update(log_labels_2903)
         except Exception as e:
             logger.warning("get_dictionary type 2903: %s", e)
-            log_labels_2903 = {}
 
-        # Build reverse dictionary (needed for changing settings)
         self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
 
-        # 3. Récupérer la liste ordonnée des clés log depuis /page/api/functionStatistics
         await self.fetch_log_items(token, log_labels_2903)
 
     async def fetch_log_items(self, token: str, log_labels_2903: dict[str, str]):
-        """
-        Appelle /page/api/functionStatistics pour obtenir la liste ordonnée des
-        clés 2903-xxxx, puis construit self.log_items à partir des labels.
-        """
         base = self.aquarea_service_cloud_url
         ref = base + "installer/home"
 
@@ -227,28 +215,22 @@ class AquareaLoginMixin:
             return
 
         raw_items = data.get("logItems", "[]")
-        # logItems est une chaîne JSON dans la réponse
-        if isinstance(raw_items, str):
-            ordered_keys: list[str] = json.loads(raw_items)
-        else:
-            ordered_keys = raw_items
+        ordered_keys: list[str] = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
 
-        logger.info("fetch_log_items: %d log keys found", len(ordered_keys))
+        # Indices réels avec trous — à utiliser dans var.logItems de /data/log
+        self.log_item_indices: list[int] = [_key_to_index(k) for k in ordered_keys]
 
         self.log_items = []
         for key in ordered_keys:
             label = log_labels_2903.get(key, key)
-            item = _parse_log_label(label)
-            logger.debug("log_item key=%s label=%r → name=%s unit=%s values=%s",
-                         key, label, item.name, item.unit, item.values)
-            self.log_items.append(item)
+            self.log_items.append(_parse_log_label(label))
 
-        logger.info("fetch_log_items: built %d log items", len(self.log_items))
-        logger.info("LOG ITEMS COUNT: %d", len(self.log_items))
-        if self.log_items:
-            logger.info("LOG ITEMS[0]: %s", self.log_items[0])
+        logger.info("fetch_log_items: %d log items built, indices sample: %s",
+                    len(self.log_items),
+                    self.log_item_indices[:10] if self.log_item_indices else [])
+
     # ------------------------------------------------------------------
-    # Méthodes legacy conservées pour compatibilité (plus utilisées)
+    # Legacy — kept for reference, no longer called
     # ------------------------------------------------------------------
 
     def extract_dictionary(self, body: bytes):
@@ -260,5 +242,4 @@ class AquareaLoginMixin:
             self.dictionary_web_ui.update(json.loads(result))
 
     def extract_log_items(self, body: bytes):
-        """Legacy HTML scraping — no longer called, kept for reference."""
         pass

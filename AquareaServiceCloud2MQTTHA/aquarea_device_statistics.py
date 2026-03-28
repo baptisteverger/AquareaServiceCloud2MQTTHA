@@ -17,9 +17,11 @@ class AquareaDeviceStatisticsMixin:
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> dict[str, str] | None:
 
-        if self.log_items:
-            indices = ",".join(str(i) for i in range(len(self.log_items)))
-            value_list = f'{{"logItems":[{indices}]}}'
+        # Utiliser les indices réels (avec trous) tels que renvoyés par
+        # /page/api/functionStatistics — le navigateur fait pareil.
+        indices: list[int] = getattr(self, "log_item_indices", None) or []
+        if indices:
+            value_list = json.dumps({"logItems": indices})
         else:
             value_list = '{"logItems":[]}'
 
@@ -56,7 +58,6 @@ class AquareaDeviceStatisticsMixin:
                     stats[f"aquarea/{user.gwid}/log/{name}/unit"] = item.unit
                 val = item.values.get(str(val), str(val))
             else:
-                # Schema shorter than data — use numeric fallback
                 name = f"item{i:03d}"
 
             stats[f"aquarea/{user.gwid}/log/{name}"] = str(val)
