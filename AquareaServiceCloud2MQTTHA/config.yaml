@@ -1,9 +1,5 @@
 name: "AquareaServiceCloud2MQTTHA"
-<<<<<<< HEAD
-version: "1.0.59"
-=======
-version: "1.0.60"
->>>>>>> testa
+version: "1.0.61"
 slug: "aquareaservicecloud2mqqtha"
 description: "Panasonic Aquarea Service Cloud to MQTT gateway (Python port)"
 url: "https://github.com/baptisteverger/AquareaServiceCloud2MQTTHA"
