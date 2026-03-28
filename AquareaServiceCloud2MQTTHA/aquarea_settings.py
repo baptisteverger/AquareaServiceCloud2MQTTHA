@@ -61,15 +61,6 @@ class AquareaSettingsMixin:
     async def get_device_settings(
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> dict[str, str]:
-<<<<<<< HEAD
-        b = await self.http_post(
-            self.aquarea_service_cloud_url + "/installer/api/function/setting/get",
-            {
-                "var.deviceId": user.device_id,
-                "shiesuahruefutohkun": shiesuahruefutohkun,
-            },
-        )
-=======
         base = self.aquarea_service_cloud_url
 
         # The browser performs a client-side SPA route change from functionStatus →
@@ -84,7 +75,6 @@ class AquareaSettingsMixin:
         )
         logger.info("[SETTING/GET RAW] %s", b[:200])
 
->>>>>>> testa
         self.aquarea_settings = AquareaFunctionSettingGetJSON.from_dict(json.loads(b))
         settings: dict[str, str] = {}
 
@@ -92,10 +82,6 @@ class AquareaSettingsMixin:
             if "user" not in key:
                 continue
             if key not in self.translation:
-<<<<<<< HEAD
-                logger.warning("No metadata in translation.json for: %s", key)
-=======
->>>>>>> testa
                 continue
 
             translation = self.translation[key]
@@ -116,24 +102,12 @@ class AquareaSettingsMixin:
                     i = int(val.selected_value, 0)
                     if "HolidayMode" not in translation.name:
                         i -= 128
-<<<<<<< HEAD
-                    # Two's complement signed 8-bit
                     value = str(int.from_bytes((i & 0xFF).to_bytes(1, "big"), "big", signed=True))
-
-=======
-                    value = str(int.from_bytes((i & 0xFF).to_bytes(1, "big"), "big", signed=True))
->>>>>>> testa
             elif val.type == "placeholder-text":
                 value = val.placeholder
 
             if value is not None:
                 settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
 
-<<<<<<< HEAD
-        # DEBUG TEMPORAIRE
-        for k, v in settings.items():
-            logger.info("[DEBUG SETTINGS] %s = %s", k, v)
-=======
         logger.info("[SETTINGS] parsed %d settings", len(settings))
->>>>>>> testa
         return settings
