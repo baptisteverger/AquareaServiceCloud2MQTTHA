@@ -10,6 +10,9 @@ from aquarea_types import AquareaEndUserJSON, AquareaLogDataJSON
 
 logger = logging.getLogger(__name__)
 
+# Valeur sentinelle Panasonic = capteur non connecté
+_SENTINEL = "-78"
+
 
 class AquareaDeviceStatisticsMixin:
 
@@ -17,11 +20,11 @@ class AquareaDeviceStatisticsMixin:
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> dict[str, str] | None:
 
-        # Utiliser les indices réels (avec trous) tels que renvoyés par
-        # /page/api/functionStatistics — le navigateur fait pareil.
-        indices: list[int] = getattr(self, "log_item_indices", None) or []
-        if indices:
-            value_list = json.dumps({"logItems": indices})
+        n = len(self.log_items)
+        if n:
+            # Indices séquentiels 0..N-1 — correspondent directement à la
+            # position dans la liste ordonnée de /page/api/functionStatistics
+            value_list = json.dumps({"logItems": list(range(n))})
         else:
             value_list = '{"logItems":[]}'
 
@@ -54,6 +57,12 @@ class AquareaDeviceStatisticsMixin:
             if i < len(self.log_items):
                 item = self.log_items[i]
                 name = item.name
+
+                # Filtrer la valeur sentinelle Panasonic (-78 = capteur non connecté)
+                if str(val) == _SENTINEL:
+                    logger.debug("log: skipping sentinel value for %s", name)
+                    continue
+
                 if item.unit:
                     stats[f"aquarea/{user.gwid}/log/{name}/unit"] = item.unit
                 val = item.values.get(str(val), str(val))

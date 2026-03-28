@@ -21,12 +21,6 @@ _MULTI_CHOICE_RE = re.compile(r"(\d+)\s*:\s*([^,\]]+)")
 _REMOVE_PARENS_RE = re.compile(r"\(.+?\)")
 
 
-def _key_to_index(key: str) -> int:
-    """Convertit '2903-01e8' en indice numérique pour var.logItems."""
-    hex_part = key.split("-")[1]
-    return (int(hex_part, 16) - 0x0104) // 4
-
-
 def _parse_log_label(raw_label: str) -> AquareaLogItem:
     label = raw_label.replace("(Actual)", "Actual").replace("(Target)", "Target")
     label = _REMOVE_PARENS_RE.sub("", label).strip()
@@ -73,9 +67,8 @@ class AquareaLoginMixin:
         Order matters:
           1. parse_device_status  — navigates to functionStatus, establishes
                                     device context in the server session.
-          2. fetch_log_items      — /page/api/functionStatistics requires a
-                                    valid session with a selected device.
-          3. get_device_settings  — functionSetting, also needs device context.
+          2. fetch_log_items      — needs valid session with selected device.
+          3. get_device_settings  — also needs device context.
           4. get_device_log_information — uses log_items built in step 2.
         """
         for user in self.users_map.values():
@@ -95,7 +88,7 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.error("Erreur status: %s", e)
 
-            # 2. Log items schema — needs device context established above
+            # 2. Log items schema — needs device context from step 1
             if not self.log_items:
                 try:
                     await self.fetch_log_items(shiesuahruefutohkun, self._log_labels_2903)
@@ -175,8 +168,7 @@ class AquareaLoginMixin:
 
     async def get_dictionary(self, user: AquareaEndUserJSON):
         """Fetch UI string translations via JSON APIs.
-        Log items schema is fetched later in aquarea_initial_fetch, after
-        device context is established by parse_device_status.
+        Log items schema fetched later in aquarea_initial_fetch.
         """
         base = self.aquarea_service_cloud_url
         home_ref = base + "installer/home"
@@ -193,7 +185,6 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.warning("get_dictionary type %s: %s", type_code, e)
 
-        # Stocker les labels 2903 pour les réutiliser dans fetch_log_items
         self._log_labels_2903: dict[str, str] = {}
         try:
             body = await self.http_get_with_referer(
@@ -211,11 +202,12 @@ class AquareaLoginMixin:
 
     async def fetch_log_items(self, token: str, log_labels_2903: dict[str, str]):
         """
-        Appelle /page/api/functionStatistics pour obtenir la liste ordonnée des
-        clés 2903-xxxx. Doit être appelé APRÈS parse_device_status.
+        Appelle /page/api/functionStatistics pour obtenir la liste ordonnée
+        des clés 2903-xxxx. Position i dans la liste = indice i dans logData.
+        Doit être appelé APRÈS parse_device_status (contexte device requis).
         """
         base = self.aquarea_service_cloud_url
-        ref = base + "installer/functionStatus"  # referer correct après navigation
+        ref = base + "installer/functionStatus"
 
         body = await self.http_get_with_referer(
             base + f"page/api/functionStatistics?shiesuahruefutohkun={token}",
@@ -229,11 +221,14 @@ class AquareaLoginMixin:
         raw_items = data.get("logItems", "[]")
         ordered_keys: list[str] = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
 
-        self.log_item_indices = [_key_to_index(k) for k in ordered_keys]
+        # Les indices sont simplement 0..N-1 — la position dans la liste
+        # est l'indice à envoyer dans var.logItems.
         self.log_items = [_parse_log_label(log_labels_2903.get(k, k)) for k in ordered_keys]
 
-        logger.info("fetch_log_items: %d log items, indices sample: %s",
-                    len(self.log_items), self.log_item_indices[:10])
+        logger.info("fetch_log_items: %d log items — e.g. [0]=%s [1]=%s",
+                    len(self.log_items),
+                    self.log_items[0].name if self.log_items else "?",
+                    self.log_items[1].name if len(self.log_items) > 1 else "?")
 
     # ------------------------------------------------------------------
     # Legacy — kept for reference, no longer called
