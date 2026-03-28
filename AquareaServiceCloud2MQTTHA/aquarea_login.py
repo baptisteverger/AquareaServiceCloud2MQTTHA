@@ -167,6 +167,7 @@ class AquareaLoginMixin:
             r"var logItems = \$\.parseJSON\('(.+)'\);",
             body.decode("utf-8", errors="replace"),
         )
+        logger.info("[LOG ITEMS] body snippet: %s", body.decode("utf-8", errors="replace")[2000:4000])
         if not match:
             return
 

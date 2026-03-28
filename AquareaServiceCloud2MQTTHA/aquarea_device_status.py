@@ -22,7 +22,7 @@ class AquareaDeviceStatusMixin:
             name = self.translation[key].name if key in self.translation else key
  
             if val.type == "basic-text":
-                value = self.dictionary_web_ui.get(val.text_value, "")
+                value = self.dictionary_web_ui.get(val.text_value, val.text_value)
             elif val.type == "simple-value":
                 value = val.value
             else:
