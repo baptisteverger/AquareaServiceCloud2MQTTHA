@@ -154,20 +154,10 @@ class AquareaDiscoveryMixin:
         config: dict[str, str] = {}
         no_dupes: dict[str, str] = {}
 
+        # 1. Filtrage des doublons
         for k, v in topics.items():
             if "/log/" not in k and "/state/" not in k:
                 continue
-
-            # Skip metadata-only topics that are not sensor values
-            name = k.split("/")[3]
-            if name in ("Timestamp", "CurrentError"):
-                continue
-
-            # Skip fallback numeric items (item000…item999) — schema not loaded yet,
-            # wait until real names are available to avoid polluting HA with junk entities.
-            if re.match(r'^item\d{3}$', name):
-                continue
-
             if k.endswith("/unit"):
                 no_dupes[k] = v
             elif f"{k}/unit" not in topics:
