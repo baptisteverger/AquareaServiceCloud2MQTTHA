@@ -68,43 +68,19 @@ class Aquarea(
             if "setting-user-select" in key
         }
 
-    async def fetch_token_from_installer_state(self) -> str:
-        """Fetch fresh token from installerState — only call after login."""
-        import json as _json
-        home_url = self.aquarea_service_cloud_url + "installer/home"
-        installer_state_url = self.aquarea_service_cloud_url + "page/api/installerState"
-        logger.info("[TOKEN] Fetching installerState")
-        body = await self.http_get_with_referer(installer_state_url, home_url)
-        logger.info("[TOKEN] Response: %s", body[:300])
-        data = _json.loads(body)
-        token = data.get("shiesuahruefutohkun")
-        if not token:
-            raise ValueError(f"No shiesuahruefutohkun in installerState: {data}")
-        self._shiesuahruefutohkun = token
-        logger.info("[TOKEN] Got token: %s", token)
-        return token
-
     async def get_shiesuahruefutohkun(self, url: str = None) -> str:
-        """Return cached token, fetching if needed."""
-        if self._shiesuahruefutohkun:
-            return self._shiesuahruefutohkun
-        return await self.fetch_token_from_installer_state()
+        """Return cached token. Raises if not yet authenticated."""
+        token = getattr(self, "_shiesuahruefutohkun", "")
+        if token:
+            return token
+        raise ValueError("Not authenticated yet — call aquarea_login() first")
 
     async def get_end_user_shiesuahruefutohkun(self, user: AquareaEndUserJSON) -> str:
-        """Return cached token."""
+        """Return cached token (same token for all users in the session)."""
         return await self.get_shiesuahruefutohkun()
 
     @staticmethod
     def extract_shiesuahruefutohkun(body: bytes) -> str:
-        """Legacy method kept for compatibility."""
-        import json as _json
-        try:
-            data = _json.loads(body)
-            token = data.get("shiesuahruefutohkun")
-            if token:
-                return token
-        except Exception:
-            pass
         match = re.search(
             r"const shiesuahruefutohkun = '(.+)'",
             body.decode("utf-8", errors="replace"),
@@ -121,21 +97,20 @@ class Aquarea(
                 await self.status_queue.put(False)
                 logger.error("%s", e)
                 logger.info("Will attempt to log in again")
-                self._shiesuahruefutohkun = ""
                 await self.aquarea_setup()
                 continue
-
-            try:
-                device_status = await self.parse_device_status(user, shiesuahruefutohkun)
-                await self.data_queue.put(device_status)
-            except Exception as e:
-                logger.error("parse_device_status: %s", e)
 
             try:
                 settings = await self.get_device_settings(user, shiesuahruefutohkun)
                 await self.data_queue.put(settings)
             except Exception as e:
                 logger.error("get_device_settings: %s", e)
+
+            try:
+                device_status = await self.parse_device_status(user, shiesuahruefutohkun)
+                await self.data_queue.put(device_status)
+            except Exception as e:
+                logger.error("parse_device_status: %s", e)
 
             try:
                 log_data = await self.get_device_log_information(user, shiesuahruefutohkun)
@@ -178,7 +153,7 @@ async def aquarea_handler(
 
     logger.info("Attempting to log in to Aquarea Service Cloud")
     while not await aq.aquarea_setup():
-        await asyncio.sleep(5)
+        pass
     logger.info("Logged in to Aquarea Service Cloud")
 
     async def poll_loop():

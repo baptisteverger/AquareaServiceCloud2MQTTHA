@@ -76,43 +76,50 @@ class AquareaLoginMixin:
                 logger.error("Erreur logs: %s", e)
 
     async def aquarea_login(self):
-        shiesuahruefutohkun = await self.get_shiesuahruefutohkun(
-            self.aquarea_service_cloud_url
-        )
+        import json as _json
+
+        # Step 1: establish session cookie
+        await self.http_get(self.aquarea_service_cloud_url + "page/api/settings")
+
+        # Step 2: POST login — browser sends shiesuahruefutohkun as "undefined" before auth
         raw = (self.aquarea_service_cloud_login + self.aquarea_service_cloud_password).encode()
         password_md5 = hashlib.md5(raw).hexdigest()
-
         b = await self.http_post(
             self.aquarea_service_cloud_url + "installer/api/auth/login",
             {
                 "var.loginId": self.aquarea_service_cloud_login,
                 "var.password": password_md5,
-                "var.inputOmit": "false",
-                "shiesuahruefutohkun": shiesuahruefutohkun,
+                "var.inputOmit": "true",
+                "shiesuahruefutohkun": "undefined",
             },
         )
-        login = AquareaLoginJSON.from_dict(json.loads(b))
+        login = AquareaLoginJSON.from_dict(_json.loads(b))
         if login.error_code != 0:
             raise RuntimeError(f"Aquarea login error code: {login.error_code}")
 
+        # Step 3: now we are authenticated — fetch the real token from installerState
+        await self.http_get(self.aquarea_service_cloud_url + "installer/home")
+        home_url = self.aquarea_service_cloud_url + "installer/home"
+        installer_state_url = self.aquarea_service_cloud_url + "page/api/installerState"
+        body = await self.http_get_with_referer(installer_state_url, home_url)
+        data = _json.loads(body)
+        token = data.get("shiesuahruefutohkun")
+        if not token:
+            raise ValueError(f"No shiesuahruefutohkun in installerState: {data}")
+        self._shiesuahruefutohkun = token
+        logger.info("Login OK, token: %s", token)
+
     async def aquarea_installer_home(self):
-        body = await self.http_get(self.aquarea_service_cloud_url + "installer/home")
-        shiesuahruefutohkun = self.extract_shiesuahruefutohkun(body)
-        self.extract_dictionary(body)
+        # Token already stored by aquarea_login() — no need to scrape HTML
+        shiesuahruefutohkun = self._shiesuahruefutohkun
 
         b = await self.http_post(
-            self.aquarea_service_cloud_url + "/installer/api/endusers",
+            self.aquarea_service_cloud_url + "installer/api/endusers",
             {
-                "var.name": "",
-                "var.deviceId": "",
-                "var.idu": "",
-                "var.odu": "",
                 "var.sortItem": "userName",
                 "var.sortOrder": "0",
                 "var.offset": "0",
-                "var.limit": "999",
-                "var.mapSizeX": "0",
-                "var.mapSizeY": "0",
+                "var.limit": "92599",
                 "var.readNew": "1",
                 "shiesuahruefutohkun": shiesuahruefutohkun,
             },
@@ -125,93 +132,27 @@ class AquareaLoginMixin:
         await self.status_queue.put(True)
 
     async def get_dictionary(self, user: AquareaEndUserJSON):
-        """Fetch UI string translations from new page/api/text endpoints (SPA migration)."""
-        import json as _json
+        """Fetch UI string translations from all sub-pages."""
+        await self.get_end_user_shiesuahruefutohkun(user)
 
-        # Fetch text dictionaries from the new JSON API
-        # Types: 2006=status labels, 2903=log item labels, 2000=misc, 2999=ui strings
-        for type_id in ["2000", "2006", "2903", "2999"]:
-            try:
-                body = await self.http_get(
-                    self.aquarea_service_cloud_url
-                    + f"page/api/text?var.types=%5B%22{type_id}%22%5D"
-                )
-                data = _json.loads(body)
-                if data.get("errorCode") == 0 and "text" in data:
-                    self.dictionary_web_ui.update(data["text"])
-            except Exception as e:
-                logger.warning("Could not fetch text type %s: %s", type_id, e)
+        body = await self.http_post(
+            self.aquarea_service_cloud_url + "installer/functionSetting", None
+        )
+        self.extract_dictionary(body)
 
         # Build reverse dictionary (needed for changing settings)
         self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
-        logger.info("Dictionary loaded: %d entries", len(self.dictionary_web_ui))
 
-        # Fetch log item schema from the statistics API endpoint
-        # (replaces scraping 'var logItems = $.parseJSON(...)' from old HTML pages)
-        await self._fetch_log_items_from_api(user)
+        body = await self.http_post(
+            self.aquarea_service_cloud_url + "installer/functionStatus", None
+        )
+        self.extract_dictionary(body)
 
-    async def _fetch_log_items_from_api(self, user: AquareaEndUserJSON):
-        """Fetch log item schema from installer/api/function/statistics (new SPA API)."""
-        import json as _json
-
-        # Need a valid token — use cached one
-        token = getattr(self, "_shiesuahruefutohkun", "")
-        if not token:
-            logger.warning("_fetch_log_items_from_api: no token available, skipping")
-            return
-
-        try:
-            b = await self.http_post_with_referer(
-                self.aquarea_service_cloud_url + "installer/api/function/statistics",
-                self.aquarea_service_cloud_url + "installer/functionStatus",
-                {"var.deviceId": user.device_id, "shiesuahruefutohkun": token},
-            )
-            data = _json.loads(b)
-            if data.get("errorCode", -1) != 0:
-                logger.warning("_fetch_log_items_from_api: errorCode=%s", data.get("errorCode"))
-                return
-
-            raw_items = data.get("logItems")
-            if not raw_items:
-                logger.warning("_fetch_log_items_from_api: no logItems field in response")
-                return
-
-            keys: list = _json.loads(raw_items)
-            logger.info("_fetch_log_items_from_api: got %d log item keys", len(keys))
-            self.extract_log_items_from_keys(keys)
-            logger.info("_fetch_log_items_from_api: built %d log items", len(self.log_items))
-
-        except Exception as e:
-            logger.warning("_fetch_log_items_from_api: failed: %s", e)
-
-    def extract_log_items_from_keys(self, keys: list):
-        """Build self.log_items from an ordered list of 2903-xxxx dictionary keys."""
-        unit_re = re.compile(r"(.+)\[(.+)\]")
-        multi_choice_re = re.compile(r"(\d+)\s*:\s*([^,]+),?")
-        remove_brackets_re = re.compile(r"\(.+\)")
-
-        self.log_items = []
-        for key in keys:
-            val = self.dictionary_web_ui.get(key, key)
-            val = val.replace("(Actual)", "Actual").replace("(Target)", "Target")
-            val = remove_brackets_re.sub("", val).strip()
-
-            split = unit_re.search(val)
-            if not split:
-                self.log_items.append(AquareaLogItem(name=val, unit="", values={}))
-                continue
-
-            name = split.group(1).strip().title()
-            name = name.replace(":", "").replace(" ", "")
-            unit_part = split.group(2)
-
-            subs = multi_choice_re.findall(unit_part)
-            if subs:
-                self.log_items.append(
-                    AquareaLogItem(name=name, unit="", values={m[0]: m[1].strip() for m in subs})
-                )
-            else:
-                self.log_items.append(AquareaLogItem(name=name, unit=unit_part, values={}))
+        body = await self.http_post(
+            self.aquarea_service_cloud_url + "installer/functionStatistics", None
+        )
+        self.extract_dictionary(body)
+        self.extract_log_items(body)
 
     def extract_dictionary(self, body: bytes):
         match = re.search(
