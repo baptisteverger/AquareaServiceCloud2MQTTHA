@@ -14,7 +14,7 @@ HEADERS_BASE = {
         "(KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
     ),
     "Accept": "*/*",
-    "Accept-Language": "fr-FR,fr;q=0.5",
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
 HEADERS_HTML = {
