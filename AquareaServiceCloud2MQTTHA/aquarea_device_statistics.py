@@ -3,9 +3,12 @@ Device statistics / log — equivalent of aquareaDeviceStatistics.go
 """
 
 import json
+import logging
 import time
 
 from aquarea_types import AquareaEndUserJSON, AquareaLogDataJSON
+
+logger = logging.getLogger(__name__)
 
 
 class AquareaDeviceStatisticsMixin:
@@ -14,10 +17,6 @@ class AquareaDeviceStatisticsMixin:
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> dict[str, str] | None:
 
-        # Build a valid JSON logItems list; omit indices when schema is unknown
-        # so the server returns all available items.
-        # Note: no leading slash — base URL already ends with '/'.
-        # Note: no trailing comma inside the array — that is invalid JSON.
         if self.log_items:
             indices = ",".join(str(i) for i in range(len(self.log_items)))
             value_list = f'{{"logItems":[{indices}]}}'
@@ -37,7 +36,8 @@ class AquareaDeviceStatisticsMixin:
             },
         )
 
-        log_data = AquareaLogDataJSON.from_dict(json.loads(b))
+        raw = json.loads(b)
+        log_data = AquareaLogDataJSON.from_dict(raw)
         if not log_data.log_data:
             return None
 
@@ -45,7 +45,6 @@ class AquareaDeviceStatisticsMixin:
         if not device_log:
             return None
 
-        # Keys are timestamps as strings; pick the most recent one numerically.
         last_key = max(device_log.keys(), key=lambda k: int(k))
         stats: dict[str, str] = {}
 
@@ -55,13 +54,12 @@ class AquareaDeviceStatisticsMixin:
                 name = item.name
                 if item.unit:
                     stats[f"aquarea/{user.gwid}/log/{name}/unit"] = item.unit
-                val = item.values.get(val, val)
+                val = item.values.get(str(val), str(val))
             else:
-                # Schema not yet loaded — publish under a numeric name so data
-                # is not silently lost while log_items is being populated.
+                # Schema shorter than data — use numeric fallback
                 name = f"item{i:03d}"
 
-            stats[f"aquarea/{user.gwid}/log/{name}"] = val
+            stats[f"aquarea/{user.gwid}/log/{name}"] = str(val)
 
         stats[f"aquarea/{user.gwid}/log/Timestamp"] = str(last_key)
         stats[f"aquarea/{user.gwid}/log/CurrentError"] = str(log_data.error_code)

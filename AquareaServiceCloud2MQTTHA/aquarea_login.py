@@ -73,20 +73,102 @@ class AquareaLoginMixin:
                 logger.info("aquarea_initial_fetch: calling get_device_log_information")
                 log_settings = await self.get_device_log_information(user, shiesuahruefutohkun)
                 if log_settings and self.log_items:
-                    # Publish HA discovery only when real names are known.
-                    # If log_items is empty, numeric names (item000…) would clutter HA.
                     ha_config = self.encode_sensors(log_settings, user)
                     await self.data_queue.put(ha_config)
                 elif log_settings and not self.log_items:
                     logger.warning(
                         "aquarea_initial_fetch: log schema unknown — "
-                        "skipping HA discovery for log sensors (no item### entities). "
-                        "Raw values still published to aquarea/%s/log/item###", user.gwid
+                        "skipping HA discovery for log sensors."
                     )
                     await self.data_queue.put(log_settings)
             except Exception as e:
                 logger.error("get_device_log_information/encode_sensors: %s", e)
         logger.info("aquarea_initial_fetch: done")
+
+    async def fetch_log_items(self, user: "AquareaEndUserJSON", shiesuahruefutohkun: str):
+        """Fetch log item schema from installer/api/function/statistics endpoint.
+
+        The response contains:
+          - logItems: JSON string with ordered list of 2903-xxxx keys
+          - The type-2903 text dictionary (fetched in get_dictionary) maps these to labels.
+        """
+        import json as _json
+        base = self.aquarea_service_cloud_url
+
+        # Fetch type-2903 text dictionary if not yet loaded
+        if not any(k.startswith("2903-") for k in self.dictionary_web_ui):
+            logger.info("fetch_log_items: fetching type-2903 text dictionary")
+            try:
+                body = await self.http_get(base + "page/api/text?var.types=%5B%222903%22%5D")
+                data = _json.loads(body)
+                if data.get("errorCode") == 0 and "text" in data:
+                    self.dictionary_web_ui.update(data["text"])
+                    self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
+                    logger.info("fetch_log_items: loaded %d type-2903 entries", len(data["text"]))
+            except Exception as e:
+                logger.warning("fetch_log_items: could not load type-2903: %s", e)
+
+        # Call the statistics API which returns the ordered logItems list
+        logger.info("fetch_log_items: calling installer/api/function/statistics")
+        try:
+            b = await self.http_post_with_referer(
+                base + "installer/api/function/statistics",
+                base + "installer/functionStatus",
+                {"var.deviceId": user.device_id, "shiesuahruefutohkun": shiesuahruefutohkun},
+            )
+            data = _json.loads(b)
+            logger.info("fetch_log_items: response keys=%s", list(data.keys()))
+
+            if data.get("errorCode", -1) != 0:
+                logger.warning("fetch_log_items: errorCode=%s", data.get("errorCode"))
+                return
+
+            log_items_raw = data.get("logItems")
+            if not log_items_raw:
+                logger.warning("fetch_log_items: no logItems in response")
+                return
+
+            # logItems is a JSON string of a list of 2903-xxxx keys
+            keys: list[str] = _json.loads(log_items_raw)
+            logger.info("fetch_log_items: got %d log item keys", len(keys))
+
+            # Build log_items by resolving each key through the 2903 dictionary,
+            # then parsing the label string (same format as old HTML logItems)
+            self.log_items = []
+            self.extract_log_items_from_keys(keys)
+            logger.info("fetch_log_items: extracted %d log items", len(self.log_items))
+
+        except Exception as e:
+            logger.warning("fetch_log_items: statistics endpoint failed: %s", e)
+
+    def extract_log_items_from_keys(self, keys: list):
+        """Build self.log_items from a list of 2903-xxxx dictionary keys."""
+        unit_re = re.compile(r"(.+)\[(.+)\]")
+        multi_choice_re = re.compile(r"(\d+)\s*:\s*([^,]+),?")
+        remove_brackets_re = re.compile(r"\(.+\)")
+
+        self.log_items = []
+        for key in keys:
+            val = self.dictionary_web_ui.get(key, key)
+            val = val.replace("(Actual)", "Actual").replace("(Target)", "Target")
+            val = remove_brackets_re.sub("", val).strip()
+
+            split = unit_re.search(val)
+            if not split:
+                self.log_items.append(AquareaLogItem(name=val, unit="", values={}))
+                continue
+
+            name = split.group(1).strip().title()
+            name = name.replace(":", "").replace(" ", "")
+            unit_part = split.group(2)
+
+            subs = multi_choice_re.findall(unit_part)
+            if subs:
+                self.log_items.append(
+                    AquareaLogItem(name=name, unit="", values={m[0]: m[1].strip() for m in subs})
+                )
+            else:
+                self.log_items.append(AquareaLogItem(name=name, unit=unit_part, values={}))
 
     async def aquarea_login(self):
         # Step 1: fetch settings to establish session/cookie
@@ -201,46 +283,6 @@ class AquareaLoginMixin:
         if match:
             result = match.group(1).replace("\\", "")
             self.dictionary_web_ui.update(json.loads(result))
-
-    async def fetch_log_items(self, user, shiesuahruefutohkun: str):
-        """Populate self.log_items by navigating to the function-data-log SPA page."""
-        base = self.aquarea_service_cloud_url
-        ref = base + "installer/functionStatus"
-
-        logger.info("fetch_log_items: navigating to installer/function-data-log")
-        body = None
-        try:
-            body = await self.http_post_navigate(
-                base + "installer/function-data-log",
-                ref,
-                {"var.functionSelectedGwUid": user.gw_uid},
-            )
-            logger.info("fetch_log_items: POST response length=%d", len(body))
-            logger.info("fetch_log_items: preview: %s", body[:500].decode("utf-8", errors="replace"))
-        except Exception as e:
-            logger.warning("fetch_log_items: POST failed (%s), trying plain GET", e)
-            try:
-                body = await self.http_get_html(base + "installer/function-data-log")
-                logger.info("fetch_log_items: GET response length=%d", len(body))
-                logger.info("fetch_log_items: preview: %s", body[:500].decode("utf-8", errors="replace"))
-            except Exception as e2:
-                logger.warning("fetch_log_items: GET also failed: %s", e2)
-                return
-
-        if not body:
-            return
-
-        body_str = body.decode("utf-8", errors="replace")
-        if "logItems" in body_str:
-            logger.info("fetch_log_items: 'logItems' found — extracting schema")
-            self.extract_log_items(body)
-            logger.info("fetch_log_items: extracted %d log items", len(self.log_items))
-        else:
-            logger.warning(
-                "fetch_log_items: 'logItems' NOT found in page response. "
-                "The SPA no longer embeds log schema in HTML. "
-                "Capture a HAR on installer/function-data-log to find the API endpoint."
-            )
 
     def extract_log_items(self, body: bytes):
         match = re.search(
