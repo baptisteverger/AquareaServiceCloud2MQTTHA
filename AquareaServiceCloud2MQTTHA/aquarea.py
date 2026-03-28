@@ -54,6 +54,7 @@ class Aquarea(
         self.reverse_translation: dict[str, str] = {}
         self.log_items: list[AquareaLogItem] = []
         self.log_item_indices: list[int] = []
+        self._log_labels_2903: dict[str, str] = {}
         self.aquarea_settings: AquareaFunctionSettingGetJSON = AquareaFunctionSettingGetJSON()
         self._shiesuahruefutohkun: str = ""
 

@@ -70,9 +70,13 @@ class AquareaLoginMixin:
     async def aquarea_initial_fetch(self):
         """First data fetch and Home Assistant discovery.
 
-        IMPORTANT: parse_device_status must run first — it navigates to
-        functionStatus and establishes the device context in the server
-        session.  get_device_settings (functionSetting) must come after.
+        Order matters:
+          1. parse_device_status  — navigates to functionStatus, establishes
+                                    device context in the server session.
+          2. fetch_log_items      — /page/api/functionStatistics requires a
+                                    valid session with a selected device.
+          3. get_device_settings  — functionSetting, also needs device context.
+          4. get_device_log_information — uses log_items built in step 2.
         """
         for user in self.users_map.values():
             try:
@@ -80,7 +84,7 @@ class AquareaLoginMixin:
             except Exception:
                 continue
 
-            # 1. Status first — establishes session context for this device
+            # 1. Status — establishes device session context
             try:
                 status_data = await self.parse_device_status(user, shiesuahruefutohkun)
                 if status_data:
@@ -91,7 +95,14 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.error("Erreur status: %s", e)
 
-            # 2. Settings after — session context now valid
+            # 2. Log items schema — needs device context established above
+            if not self.log_items:
+                try:
+                    await self.fetch_log_items(shiesuahruefutohkun, self._log_labels_2903)
+                except Exception as e:
+                    logger.error("Erreur fetch_log_items: %s", e)
+
+            # 3. Settings
             try:
                 settings = await self.get_device_settings(user, shiesuahruefutohkun)
                 ha_config = self.encode_switches(settings, user)
@@ -100,7 +111,7 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.error("Erreur settings: %s", e)
 
-            # 3. Logs
+            # 4. Logs
             try:
                 log_data = await self.get_device_log_information(user, shiesuahruefutohkun)
                 if log_data:
@@ -163,7 +174,10 @@ class AquareaLoginMixin:
         await self.status_queue.put(True)
 
     async def get_dictionary(self, user: AquareaEndUserJSON):
-        token = self._shiesuahruefutohkun
+        """Fetch UI string translations via JSON APIs.
+        Log items schema is fetched later in aquarea_initial_fetch, after
+        device context is established by parse_device_status.
+        """
         base = self.aquarea_service_cloud_url
         home_ref = base + "installer/home"
 
@@ -179,7 +193,8 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.warning("get_dictionary type %s: %s", type_code, e)
 
-        log_labels_2903: dict[str, str] = {}
+        # Stocker les labels 2903 pour les réutiliser dans fetch_log_items
+        self._log_labels_2903: dict[str, str] = {}
         try:
             body = await self.http_get_with_referer(
                 base + "page/api/text?var.types=%5B%222903%22%5D",
@@ -187,47 +202,38 @@ class AquareaLoginMixin:
             )
             data = json.loads(body)
             if data.get("errorCode", -1) == 0:
-                log_labels_2903 = data.get("text", {})
-                self.dictionary_web_ui.update(log_labels_2903)
+                self._log_labels_2903 = data.get("text", {})
+                self.dictionary_web_ui.update(self._log_labels_2903)
         except Exception as e:
             logger.warning("get_dictionary type 2903: %s", e)
 
         self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
 
-        await self.fetch_log_items(token, log_labels_2903)
-
     async def fetch_log_items(self, token: str, log_labels_2903: dict[str, str]):
+        """
+        Appelle /page/api/functionStatistics pour obtenir la liste ordonnée des
+        clés 2903-xxxx. Doit être appelé APRÈS parse_device_status.
+        """
         base = self.aquarea_service_cloud_url
-        ref = base + "installer/home"
+        ref = base + "installer/functionStatus"  # referer correct après navigation
 
-        try:
-            body = await self.http_get_with_referer(
-                base + f"page/api/functionStatistics?shiesuahruefutohkun={token}",
-                ref,
-            )
-            data = json.loads(body)
-        except Exception as e:
-            logger.error("fetch_log_items: %s", e)
-            return
+        body = await self.http_get_with_referer(
+            base + f"page/api/functionStatistics?shiesuahruefutohkun={token}",
+            ref,
+        )
+        data = json.loads(body)
 
         if data.get("errorCode", -1) != 0:
-            logger.error("fetch_log_items errorCode=%s", data.get("errorCode"))
-            return
+            raise RuntimeError(f"fetch_log_items errorCode={data.get('errorCode')}")
 
         raw_items = data.get("logItems", "[]")
         ordered_keys: list[str] = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
 
-        # Indices réels avec trous — à utiliser dans var.logItems de /data/log
-        self.log_item_indices: list[int] = [_key_to_index(k) for k in ordered_keys]
+        self.log_item_indices = [_key_to_index(k) for k in ordered_keys]
+        self.log_items = [_parse_log_label(log_labels_2903.get(k, k)) for k in ordered_keys]
 
-        self.log_items = []
-        for key in ordered_keys:
-            label = log_labels_2903.get(key, key)
-            self.log_items.append(_parse_log_label(label))
-
-        logger.info("fetch_log_items: %d log items built, indices sample: %s",
-                    len(self.log_items),
-                    self.log_item_indices[:10] if self.log_item_indices else [])
+        logger.info("fetch_log_items: %d log items, indices sample: %s",
+                    len(self.log_items), self.log_item_indices[:10])
 
     # ------------------------------------------------------------------
     # Legacy — kept for reference, no longer called
