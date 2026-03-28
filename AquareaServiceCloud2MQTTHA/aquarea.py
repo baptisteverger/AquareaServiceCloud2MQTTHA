@@ -68,41 +68,36 @@ class Aquarea(
             if "setting-user-select" in key
         }
 
-    async def get_shiesuahruefutohkun(self, url: str = None) -> str:
-        """Fetch shiesuahruefutohkun from the new installerState API endpoint."""
+    async def fetch_token_from_installer_state(self) -> str:
+        """Fetch fresh token from installerState — only call after login."""
         import json as _json
-        # Must visit /installer/home first to set Referer
         home_url = self.aquarea_service_cloud_url + "installer/home"
         installer_state_url = self.aquarea_service_cloud_url + "page/api/installerState"
-        logger.info("[TOKEN] Visiting installer/home first")
-        await self.http_get(home_url)
-        logger.info("[TOKEN] Fetching installerState with Referer")
-        try:
-            body = await self.http_get_with_referer(installer_state_url, home_url)
-            logger.info("[TOKEN] Response: %s", body[:500])
-            data = _json.loads(body)
-            token = data.get("shiesuahruefutohkun")
-            if not token:
-                logger.error("[TOKEN] No shiesuahruefutohkun in response: %s", data)
-                raise ValueError("Could not extract shiesuahruefutohkun from installerState")
-            logger.info("[TOKEN] Got token: %s", token)
-            self._shiesuahruefutohkun = token
-            return token
-        except _json.JSONDecodeError as e:
-            logger.error("[TOKEN] JSON decode error: %s — body: %s", e, body[:500])
-            raise ValueError(f"Could not parse installerState response: {e}")
+        logger.info("[TOKEN] Fetching installerState")
+        body = await self.http_get_with_referer(installer_state_url, home_url)
+        logger.info("[TOKEN] Response: %s", body[:300])
+        data = _json.loads(body)
+        token = data.get("shiesuahruefutohkun")
+        if not token:
+            raise ValueError(f"No shiesuahruefutohkun in installerState: {data}")
+        self._shiesuahruefutohkun = token
+        logger.info("[TOKEN] Got token: %s", token)
+        return token
+
+    async def get_shiesuahruefutohkun(self, url: str = None) -> str:
+        """Return cached token, fetching if needed."""
+        if self._shiesuahruefutohkun:
+            return self._shiesuahruefutohkun
+        return await self.fetch_token_from_installer_state()
 
     async def get_end_user_shiesuahruefutohkun(self, user: AquareaEndUserJSON) -> str:
-        """Reuse cached token if available, otherwise fetch fresh one."""
-        if hasattr(self, "_shiesuahruefutohkun") and self._shiesuahruefutohkun:
-            return self._shiesuahruefutohkun
+        """Return cached token."""
         return await self.get_shiesuahruefutohkun()
 
     @staticmethod
     def extract_shiesuahruefutohkun(body: bytes) -> str:
         """Legacy method kept for compatibility."""
-        import re as _re, json as _json
-        # Try new JSON format first
+        import json as _json
         try:
             data = _json.loads(body)
             token = data.get("shiesuahruefutohkun")
@@ -110,8 +105,7 @@ class Aquarea(
                 return token
         except Exception:
             pass
-        # Fall back to old HTML pattern
-        match = _re.search(
+        match = re.search(
             r"const shiesuahruefutohkun = '(.+)'",
             body.decode("utf-8", errors="replace"),
         )
@@ -127,20 +121,21 @@ class Aquarea(
                 await self.status_queue.put(False)
                 logger.error("%s", e)
                 logger.info("Will attempt to log in again")
+                self._shiesuahruefutohkun = ""
                 await self.aquarea_setup()
                 continue
-
-            try:
-                settings = await self.get_device_settings(user, shiesuahruefutohkun)
-                await self.data_queue.put(settings)
-            except Exception as e:
-                logger.error("get_device_settings: %s", e)
 
             try:
                 device_status = await self.parse_device_status(user, shiesuahruefutohkun)
                 await self.data_queue.put(device_status)
             except Exception as e:
                 logger.error("parse_device_status: %s", e)
+
+            try:
+                settings = await self.get_device_settings(user, shiesuahruefutohkun)
+                await self.data_queue.put(settings)
+            except Exception as e:
+                logger.error("get_device_settings: %s", e)
 
             try:
                 log_data = await self.get_device_log_information(user, shiesuahruefutohkun)
@@ -183,7 +178,7 @@ async def aquarea_handler(
 
     logger.info("Attempting to log in to Aquarea Service Cloud")
     while not await aq.aquarea_setup():
-        pass
+        await asyncio.sleep(5)
     logger.info("Logged in to Aquarea Service Cloud")
 
     async def poll_loop():
