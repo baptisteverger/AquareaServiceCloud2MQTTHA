@@ -28,8 +28,6 @@ class AquareaDeviceStatusMixin:
             else:
                 value = ""
 
-        
-
             device_status[f"aquarea/{user.gwid}/state/{name}"] = value
 
         return device_status
@@ -37,8 +35,31 @@ class AquareaDeviceStatusMixin:
     async def get_device_status(
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> AquareaStatusResponseJSON:
-        b = await self.http_post(
-            self.aquarea_service_cloud_url + "/installer/api/function/status",
+        base = self.aquarea_service_cloud_url
+        ref = base + "installer/functionStatus"
+        home_ref = base + "installer/home"
+
+        # Navigate to functionStatus via POST with var.functionSelectedGwUid — exactly
+        # as the real browser does (application/x-www-form-urlencoded, Sec-Fetch-Mode: navigate).
+        # A plain GET does NOT establish the device context in the server session.
+        await self.http_post_navigate(
+            base + "installer/functionStatus",
+            home_ref,
+            {"var.functionSelectedGwUid": user.gw_uid},
+        )
+
+        # Reproduce exact browser API calls after navigation
+        await self.http_get_with_referer(base + "page/api/installerState", ref)
+        await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222006%22%5D", ref)
+        await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222999%22%5D", ref)
+        await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222000%22%5D", ref)
+        await self.http_get_with_referer(base + f"page/api/onetrust?shiesuahruefutohkun={shiesuahruefutohkun}", ref)
+        await self.http_get_with_referer(base + f"page/api/userInfo?shiesuahruefutohkun={shiesuahruefutohkun}", ref)
+
+        # POST function/status — activates the device in the server session
+        b = await self.http_post_with_referer(
+            base + "installer/api/function/status",
+            ref,
             {
                 "var.deviceId": user.device_id,
                 "shiesuahruefutohkun": shiesuahruefutohkun,
