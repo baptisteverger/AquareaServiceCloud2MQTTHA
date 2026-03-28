@@ -19,8 +19,6 @@ class AquareaDeviceStatisticsMixin:
 
         n = len(self.log_items)
         if n:
-            # Indices séquentiels 0..N-1 — correspondent directement à la
-            # position dans la liste ordonnée de /page/api/functionStatistics
             value_list = json.dumps({"logItems": list(range(n))})
         else:
             value_list = '{"logItems":[]}'
@@ -64,4 +62,12 @@ class AquareaDeviceStatisticsMixin:
 
         stats[f"aquarea/{user.gwid}/log/Timestamp"] = str(last_key)
         stats[f"aquarea/{user.gwid}/log/CurrentError"] = str(log_data.error_code)
+
+        logger.info(
+            "Panasonic log data for device %s, timestamp %s (%d values): %s",
+            user.gwid,
+            last_key,
+            len(stats),
+            json.dumps(stats, ensure_ascii=False),
+        )
         return stats

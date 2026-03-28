@@ -71,18 +71,14 @@ class Aquarea(
 
     async def fetch_token_from_installer_state(self) -> str:
         """Fetch fresh token from installerState — only call after login."""
-        import json as _json
         home_url = self.aquarea_service_cloud_url + "installer/home"
         installer_state_url = self.aquarea_service_cloud_url + "page/api/installerState"
-        logger.info("[TOKEN] Fetching installerState")
         body = await self.http_get_with_referer(installer_state_url, home_url)
-        logger.info("[TOKEN] Response: %s", body[:300])
-        data = _json.loads(body)
+        data = json.loads(body)
         token = data.get("shiesuahruefutohkun")
         if not token:
             raise ValueError(f"No shiesuahruefutohkun in installerState: {data}")
         self._shiesuahruefutohkun = token
-        logger.info("[TOKEN] Got token: %s", token)
         return token
 
     async def get_shiesuahruefutohkun(self, url: str = None) -> str:
@@ -98,9 +94,8 @@ class Aquarea(
     @staticmethod
     def extract_shiesuahruefutohkun(body: bytes) -> str:
         """Legacy method kept for compatibility."""
-        import json as _json
         try:
-            data = _json.loads(body)
+            data = json.loads(body)
             token = data.get("shiesuahruefutohkun")
             if token:
                 return token
@@ -120,7 +115,7 @@ class Aquarea(
                 shiesuahruefutohkun = await self.get_end_user_shiesuahruefutohkun(user)
             except Exception as e:
                 await self.status_queue.put(False)
-                logger.error("%s", e)
+                logger.error("Failed to get token for device %s: %s", user.gwid, e)
                 logger.info("Will attempt to log in again")
                 self._shiesuahruefutohkun = ""
                 await self.aquarea_setup()
@@ -130,20 +125,20 @@ class Aquarea(
                 device_status = await self.parse_device_status(user, shiesuahruefutohkun)
                 await self.data_queue.put(device_status)
             except Exception as e:
-                logger.error("parse_device_status: %s", e)
+                logger.error("parse_device_status failed for device %s: %s", user.gwid, e)
 
             try:
                 settings = await self.get_device_settings(user, shiesuahruefutohkun)
                 await self.data_queue.put(settings)
             except Exception as e:
-                logger.error("get_device_settings: %s", e)
+                logger.error("get_device_settings failed for device %s: %s", user.gwid, e)
 
             try:
                 log_data = await self.get_device_log_information(user, shiesuahruefutohkun)
                 if log_data:
                     await self.data_queue.put(log_data)
             except Exception as e:
-                logger.error("get_device_log_information: %s", e)
+                logger.error("get_device_log_information failed for device %s: %s", user.gwid, e)
 
 
 async def aquarea_handler(

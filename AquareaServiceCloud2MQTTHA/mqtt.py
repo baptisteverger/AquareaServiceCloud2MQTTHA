@@ -45,7 +45,7 @@ async def mqtt_handler(
                     device_id = parts[1]
                     setting = parts[3]
                     value = msg.payload.decode()
-                    logger.info("Received: Device ID %s setting: %s", device_id, setting)
+                    logger.info("Command received: device=%s setting=%s value=%s", device_id, setting, value)
                     await command_queue.put(
                         AquareaCommand(device_id=device_id, setting=setting, value=value)
                     )
@@ -56,21 +56,18 @@ async def mqtt_handler(
                 try:
                     while True:
                         data = data_queue.get_nowait()
-                        
 
                         if data is None:
-                            logger.warning("Data queue a reçu 'None', on ignore pour éviter le crash.")
+                            logger.warning("Received None in data queue, skipping")
                             continue
-                            
+
                         if not isinstance(data, dict):
-                            logger.error(f"Format de donnée invalide reçu: {type(data)}")
+                            logger.error("Invalid data format in queue: %s", type(data))
                             continue
-                        # -----------------------------------------------------------
 
                         for key, value in data.items():
-
                             await client.publish(key, value, qos=0, retain=True)
-                            
+
                 except asyncio.QueueEmpty:
                     pass
 

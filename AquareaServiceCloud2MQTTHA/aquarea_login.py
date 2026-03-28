@@ -86,14 +86,14 @@ class AquareaLoginMixin:
                         await self.data_queue.put(ha_config_state)
                     await self.data_queue.put(status_data)
             except Exception as e:
-                logger.error("Erreur status: %s", e)
+                logger.error("Initial status fetch failed for device %s: %s", user.gwid, e)
 
             # 2. Log items schema — needs device context from step 1
             if not self.log_items:
                 try:
                     await self.fetch_log_items(shiesuahruefutohkun, self._log_labels_2903)
                 except Exception as e:
-                    logger.error("Erreur fetch_log_items: %s", e)
+                    logger.error("fetch_log_items failed for device %s: %s", user.gwid, e)
 
             # 3. Settings
             try:
@@ -102,7 +102,7 @@ class AquareaLoginMixin:
                 if ha_config:
                     await self.data_queue.put(ha_config)
             except Exception as e:
-                logger.error("Erreur settings: %s", e)
+                logger.error("Initial settings fetch failed for device %s: %s", user.gwid, e)
 
             # 4. Logs
             try:
@@ -112,7 +112,7 @@ class AquareaLoginMixin:
                     if ha_config:
                         await self.data_queue.put(ha_config)
             except Exception as e:
-                logger.error("Erreur logs: %s", e)
+                logger.error("Initial log fetch failed for device %s: %s", user.gwid, e)
 
     async def aquarea_login(self):
         import json as _json
@@ -183,7 +183,7 @@ class AquareaLoginMixin:
                 if data.get("errorCode", -1) == 0:
                     self.dictionary_web_ui.update(data.get("text", {}))
             except Exception as e:
-                logger.warning("get_dictionary type %s: %s", type_code, e)
+                logger.warning("Failed to fetch UI dictionary type %s: %s", type_code, e)
 
         self._log_labels_2903: dict[str, str] = {}
         try:
@@ -195,8 +195,13 @@ class AquareaLoginMixin:
             if data.get("errorCode", -1) == 0:
                 self._log_labels_2903 = data.get("text", {})
                 self.dictionary_web_ui.update(self._log_labels_2903)
+                logger.info(
+                    "Panasonic log dictionary (2903): %d entries received — %s",
+                    len(self._log_labels_2903),
+                    json.dumps(self._log_labels_2903, ensure_ascii=False),
+                )
         except Exception as e:
-            logger.warning("get_dictionary type 2903: %s", e)
+            logger.warning("Failed to fetch log dictionary (2903): %s", e)
 
         self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
 
@@ -221,14 +226,16 @@ class AquareaLoginMixin:
         raw_items = data.get("logItems", "[]")
         ordered_keys: list[str] = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
 
-        # Les indices sont simplement 0..N-1 — la position dans la liste
-        # est l'indice à envoyer dans var.logItems.
         self.log_items = [_parse_log_label(log_labels_2903.get(k, k)) for k in ordered_keys]
 
-        logger.info("fetch_log_items: %d log items — e.g. [0]=%s [1]=%s",
-                    len(self.log_items),
-                    self.log_items[0].name if self.log_items else "?",
-                    self.log_items[1].name if len(self.log_items) > 1 else "?")
+        logger.info(
+            "Panasonic log schema (functionStatistics): %d items — %s",
+            len(self.log_items),
+            ", ".join(
+                f"{item.name}{'['+item.unit+']' if item.unit else ''}"
+                for item in self.log_items
+            ),
+        )
 
     # ------------------------------------------------------------------
     # Legacy — kept for reference, no longer called

@@ -22,7 +22,6 @@ class AquareaDeviceStatusMixin:
             name = self.translation[key].name if key in self.translation else key
 
             if val.type == "basic-text":
-                # Fallback sur la valeur brute si la traduction est absente
                 value = self.dictionary_web_ui.get(val.text_value, val.text_value)
             elif val.type == "simple-value":
                 value = val.value
@@ -31,6 +30,12 @@ class AquareaDeviceStatusMixin:
 
             device_status[f"aquarea/{user.gwid}/state/{name}"] = value
 
+        logger.info(
+            "Panasonic status data for device %s (%d values): %s",
+            user.gwid,
+            len(device_status),
+            json.dumps(device_status, ensure_ascii=False),
+        )
         return device_status
 
     async def get_device_status(
