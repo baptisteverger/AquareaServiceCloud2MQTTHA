@@ -29,12 +29,6 @@ class AquareaDeviceStatusMixin:
             else:
                 value = ""
 
-            # Ne pas publier les capteurs sans valeur (équipements non connectés)
-            # — évite les "Unknown" dans HA pour Zone2, BufferTank, Solar, etc.
-            if value == "":
-                logger.debug("parse_device_status: skipping empty value for %s", name)
-                continue
-
             device_status[f"aquarea/{user.gwid}/state/{name}"] = value
 
         return device_status

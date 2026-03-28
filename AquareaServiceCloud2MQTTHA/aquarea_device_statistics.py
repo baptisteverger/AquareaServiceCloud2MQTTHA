@@ -10,9 +10,6 @@ from aquarea_types import AquareaEndUserJSON, AquareaLogDataJSON
 
 logger = logging.getLogger(__name__)
 
-# Valeur sentinelle Panasonic = capteur non connecté
-_SENTINEL = "-78"
-
 
 class AquareaDeviceStatisticsMixin:
 
@@ -57,12 +54,6 @@ class AquareaDeviceStatisticsMixin:
             if i < len(self.log_items):
                 item = self.log_items[i]
                 name = item.name
-
-                # Filtrer la valeur sentinelle Panasonic (-78 = capteur non connecté)
-                if str(val) == _SENTINEL:
-                    logger.debug("log: skipping sentinel value for %s", name)
-                    continue
-
                 if item.unit:
                     stats[f"aquarea/{user.gwid}/log/{name}/unit"] = item.unit
                 val = item.values.get(str(val), str(val))
