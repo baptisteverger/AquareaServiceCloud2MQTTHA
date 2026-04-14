@@ -30,7 +30,7 @@ class AquareaDeviceStatusMixin:
 
             device_status[f"aquarea/{user.gwid}/state/{name}"] = value
 
-        logger.info(
+        logger.debug(
             "Panasonic status data for device %s (%d values): %s",
             user.gwid,
             len(device_status),

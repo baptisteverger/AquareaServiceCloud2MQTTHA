@@ -108,7 +108,7 @@ class AquareaSettingsMixin:
             if value is not None:
                 settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
 
-        logger.info(
+        logger.debug(
             "Panasonic settings data for device %s (%d values): %s",
             user.gwid,
             len(settings),
