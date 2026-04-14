@@ -195,7 +195,7 @@ class AquareaLoginMixin:
             if data.get("errorCode", -1) == 0:
                 self._log_labels_2903 = data.get("text", {})
                 self.dictionary_web_ui.update(self._log_labels_2903)
-                logger.info("Panasonic loading dictionary (List available in log debug)"
+                logger.info("Panasonic loading dictionary (List available in log debug)")
                 logger.debug(
                     "Panasonic log dictionary (2903): %d entries received — %s",
                     len(self._log_labels_2903),
