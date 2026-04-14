@@ -1,5 +1,5 @@
 name: "AquareaServiceCloud2MQTTHA"
-version: "1.0.83"
+version: "1.0.84"
 slug: "aquareaservicecloud2mqqtha"
 description: "Panasonic Aquarea Service Cloud to MQTT gateway (Python port)"
 url: "https://github.com/baptisteverger/AquareaServiceCloud2MQTTHA"
@@ -9,6 +9,7 @@ arch:
   - armhf
   - armv7
   - i386
+image: ghcr.io/home-assistant/{arch}-base-python:3.13-alpine3.22
 startup: application
 boot: auto
 init: false
