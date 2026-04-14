@@ -62,8 +62,8 @@ class AquareaDeviceStatisticsMixin:
 
         stats[f"aquarea/{user.gwid}/log/Timestamp"] = str(last_key)
         stats[f"aquarea/{user.gwid}/log/CurrentError"] = str(log_data.error_code)
-
-        logger.info(
+        logger.info("Get new Panasonic log data for device %s", user.gwid)
+        logger.debug(
             "Panasonic log data for device %s, timestamp %s (%d values): %s",
             user.gwid,
             last_key,
