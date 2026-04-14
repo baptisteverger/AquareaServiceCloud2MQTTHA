@@ -195,7 +195,8 @@ class AquareaLoginMixin:
             if data.get("errorCode", -1) == 0:
                 self._log_labels_2903 = data.get("text", {})
                 self.dictionary_web_ui.update(self._log_labels_2903)
-                logger.info(
+                logger.info("Panasonic loading dictionary (List available in log debug)"
+                logger.debug(
                     "Panasonic log dictionary (2903): %d entries received — %s",
                     len(self._log_labels_2903),
                     json.dumps(self._log_labels_2903, ensure_ascii=False),
@@ -227,8 +228,8 @@ class AquareaLoginMixin:
         ordered_keys: list[str] = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
 
         self.log_items = [_parse_log_label(log_labels_2903.get(k, k)) for k in ordered_keys]
-
-        logger.info(
+        logger.info("Panasonic loading schema (List available in log debug)");
+        logger.debug(
             "Panasonic log schema (functionStatistics): %d items — %s",
             len(self.log_items),
             ", ".join(
