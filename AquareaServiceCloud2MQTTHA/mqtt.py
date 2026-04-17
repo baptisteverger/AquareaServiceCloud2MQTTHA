@@ -30,6 +30,8 @@ async def mqtt_handler(
 
     while not ctx.is_set():
         try:
+            if attempt > 0:
+                logger.info("MQTT attempting reconnection #%d...", attempt)
             async with aiomqtt.Client(
                 hostname=config["MqttServer"],
                 port=config.get("MqttPort", 1883),
