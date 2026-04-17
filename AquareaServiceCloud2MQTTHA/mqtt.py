@@ -41,7 +41,7 @@ async def mqtt_handler(
             ) as client:
                 logger.info("MQTT connected")
                 await client.subscribe(SUBSCRIBE_TOPIC, qos=2)
-                await client.publish(STATUS_TOPIC, "offline", qos=0, retain=True)
+                await client.publish(STATUS_TOPIC, "online", qos=0, retain=True)
 
                 async def read_incoming():
                     async for msg in client.messages:

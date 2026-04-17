@@ -140,6 +140,8 @@ class Aquarea(
             except Exception as e:
                 logger.error("get_device_log_information failed for device %s: %s", user.gwid, e)
 
+            await self.status_queue.put(True)
+
 
 async def aquarea_handler(
     ctx: asyncio.Event,
