@@ -26,6 +26,7 @@ async def mqtt_handler(
     logger.info("Starting MQTT handler")
 
     keepalive = int(float(config.get("MqttKeepalive", 60)))
+    attempt = 0
 
     while not ctx.is_set():
         try:
@@ -39,7 +40,11 @@ async def mqtt_handler(
                 clean_session=True,
                 will=aiomqtt.Will(topic=STATUS_TOPIC, payload="offline", qos=0, retain=True),
             ) as client:
-                logger.info("MQTT connected")
+                if attempt == 0:
+                    logger.info("MQTT connected to %s:%s", config["MqttServer"], config.get("MqttPort", 1883))
+                else:
+                    logger.info("MQTT reconnected to %s:%s (after %d attempt(s))", config["MqttServer"], config.get("MqttPort", 1883), attempt)
+                attempt = 0
                 await client.subscribe(SUBSCRIBE_TOPIC, qos=2)
                 await client.publish(STATUS_TOPIC, "online", qos=0, retain=True)
 
@@ -94,11 +99,13 @@ async def mqtt_handler(
         except aiomqtt.MqttError as e:
             if ctx.is_set():
                 break
+            attempt += 1
             logger.warning("MQTT connection lost (%s), reconnecting in %ds...", e, RECONNECT_INTERVAL)
             await asyncio.sleep(RECONNECT_INTERVAL)
         except Exception as e:
             if ctx.is_set():
                 break
+            attempt += 1
             logger.error("Unexpected MQTT error (%s), reconnecting in %ds...", e, RECONNECT_INTERVAL)
             await asyncio.sleep(RECONNECT_INTERVAL)
 
