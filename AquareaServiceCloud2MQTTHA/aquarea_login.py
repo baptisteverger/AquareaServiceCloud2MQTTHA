@@ -173,7 +173,71 @@ class AquareaLoginMixin:
         base = self.aquarea_service_cloud_url
         home_ref = base + "installer/home"
 
-        for type_code in ["2000", "2006", "2999"]:
+        # Static fallback for type 2010 — used if the API call fails.
+        # Values sourced from the real Aquarea Service Cloud API (English).
+        _DICT_2010_FALLBACK: dict[str, str] = {
+            # Operation
+            "2010-00D7": "Power: Off",
+            "2010-00DC": "Power: On",
+            # OperationMode
+            "2010-00E1": "Tank",
+            "2010-00E6": "Heat",
+            "2010-00EB": "Cool",
+            "2010-00F0": "Auto",
+            "2010-00F5": "Heat + Tank",
+            "2010-00FA": "Cool + Tank",
+            "2010-00FF": "Auto + Tank",
+            # ZoneOperationSetting
+            "2010-0122": "Zone1: On, Zone2: Off",
+            "2010-0127": "Zone1: Off, Zone2: On",
+            "2010-012C": "Zone1: On, Zone2: On",
+            # ForceDHW (0x01=Off, 0x02=On)
+            "2010-0136": "Off",
+            "2010-013B": "On",
+            # WeeklyTimer (0x01=Off, 0x02=On)
+            "2010-0140": "Off",
+            "2010-0145": "On",
+            # HolidayMode (0x01=Off, 0x02=On)
+            "2010-014A": "Off",
+            "2010-014F": "On",
+            # QuietTimer (0x01=Off, 0x02=On)
+            "2010-0168": "Off",
+            "2010-016D": "On",
+            # QuietMode
+            "2010-0172": "Off",
+            "2010-0177": "Level1",
+            "2010-017C": "Level2",
+            "2010-0181": "Level3",
+            # Priority
+            "2010-0182": "Priority: Sound",
+            "2010-0183": "Priority: Capacity",
+            # RoomHeater (0x01=Off, 0x02=On)
+            "2010-0186": "Off",
+            "2010-018B": "On",
+            # TankHeater (0x01=Off, 0x02=On)
+            "2010-0190": "Off",
+            "2010-0195": "On",
+            # TankSensor
+            "2010-0197": "Top",
+            "2010-0198": "Center",
+            # Sterilization
+            "2010-019A": "Request",
+            # Powerful
+            "2010-01A4": "Off",
+            "2010-01A9": "On 30 mins",
+            "2010-01AE": "On 60 mins",
+            "2010-01B3": "On 90 mins",
+            # ForceHeater (0x01=Off, 0x02=On)
+            "2010-01B8": "Off",
+            "2010-01BD": "On",
+            # ForceDefrost
+            "2010-01C2": "Request",
+        }
+        self.dictionary_web_ui.update(_DICT_2010_FALLBACK)
+
+        # Fetch all types including 2010 — API returns English when account language is set.
+        # Type 2010 will override the static fallback above if returned successfully.
+        for type_code in ["2000", "2006", "2999", "2010"]:
             try:
                 body = await self.http_get_with_referer(
                     base + f"page/api/text?var.types=%5B%22{type_code}%22%5D",
@@ -181,30 +245,24 @@ class AquareaLoginMixin:
                 )
                 data = json.loads(body)
                 if data.get("errorCode", -1) == 0:
-                    self.dictionary_web_ui.update(data.get("text", {}))
+                    received = data.get("text", {})
+                    # For type 2010: only accept entries starting with "2010-"
+                    # to avoid polluting the dict with unrelated codes
+                    if type_code == "2010":
+                        only_2010 = {k: v for k, v in received.items() if k.startswith("2010-")}
+                        if only_2010:
+                            self.dictionary_web_ui.update(only_2010)
+                            logger.info(
+                                "Loaded %d live type-2010 entries from API (overrides fallback)",
+                                len(only_2010),
+                            )
+                        else:
+                            logger.debug("Type 2010 API returned no 2010-* entries, using fallback")
+                    else:
+                        self.dictionary_web_ui.update(received)
             except Exception as e:
                 logger.warning("Failed to fetch UI dictionary type %s: %s", type_code, e)
 
-        self._log_labels_2903: dict[str, str] = {}
-        try:
-            body = await self.http_get_with_referer(
-                base + "page/api/text?var.types=%5B%222903%22%5D",
-                home_ref,
-            )
-            data = json.loads(body)
-            if data.get("errorCode", -1) == 0:
-                self._log_labels_2903 = data.get("text", {})
-                self.dictionary_web_ui.update(self._log_labels_2903)
-                logger.info("Panasonic loading dictionary (List available in log debug)")
-                logger.debug(
-                    "Panasonic log dictionary (2903): %d entries received — %s",
-                    len(self._log_labels_2903),
-                    json.dumps(self._log_labels_2903, ensure_ascii=False),
-                )
-        except Exception as e:
-            logger.warning("Failed to fetch log dictionary (2903): %s", e)
-
-        self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
 
     async def fetch_log_items(self, token: str, log_labels_2903: dict[str, str]):
         """

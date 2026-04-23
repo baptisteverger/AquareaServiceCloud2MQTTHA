@@ -186,6 +186,32 @@ def encode_select(name: str, device_id: str, state_topic: str, options: list[str
     return ha_topic, _to_json(s)
 
 
+@dataclass
+class MqttButton:
+    """HA MQTT button — pour les actions ponctuelles (Request)."""
+    name: str = ""
+    availability_topic: str = ""
+    command_topic: str = ""
+    payload_press: str = ""
+    unique_id: str = ""
+    device: _Device = field(default_factory=_Device)
+
+
+def encode_button(name: str, device_id: str, state_topic: str, payload: str) -> tuple[str, str]:
+    """Bouton HA pour actions ponctuelles (Sterilization, ForceDefrost)."""
+    safe = name.replace(" ", "_")
+    b = MqttButton(
+        name=name,
+        availability_topic="aquarea/status",
+        command_topic=state_topic + "/set",
+        payload_press=payload,
+        unique_id=f"{device_id}_{safe}",
+        device=_panasonic(device_id),
+    )
+    ha_topic = f"homeassistant/button/{device_id}/{safe}/config"
+    return ha_topic, _to_json(b)
+
+
 # ---------------------------------------------------------------------------
 # Mixin principal
 # ---------------------------------------------------------------------------
@@ -219,11 +245,15 @@ class AquareaDiscoveryMixin:
                 continue
 
             has_on_off = any(
-                "Off" in val or "On" in val or "Request" in val
+                "Off" in val or "On" in val or "Request" in val or "Demande" in val
                 for val in values
             )
 
-            if len(values) <= 2 and has_on_off:
+            # Cas bouton : une seule option action (Request/Demande) → HA button
+            if len(values) == 1 and values[0] in ("Request", "Demande"):
+                ha_topic, ha_data = encode_button(name, device_id, state_topic, "Request")
+                config[ha_topic] = ha_data
+            elif len(values) <= 2 and has_on_off:
                 # Tentative switch binaire
                 try:
                     ha_topic, ha_data = encode_switch(name, device_id, state_topic, values)
@@ -233,7 +263,7 @@ class AquareaDiscoveryMixin:
                     ha_topic, ha_data = encode_select(name, device_id, state_topic, values)
                     config[ha_topic] = ha_data
             else:
-                # Select multi-choix (Heat/Cool/Auto, niveaux, etc.)
+                # Select multi-choix (modes, niveaux, etc.)
                 ha_topic, ha_data = encode_select(name, device_id, state_topic, values)
                 config[ha_topic] = ha_data
 
