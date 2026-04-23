@@ -263,6 +263,26 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.warning("Failed to fetch UI dictionary type %s: %s", type_code, e)
 
+        self._log_labels_2903: dict[str, str] = {}
+        try:
+            body = await self.http_get_with_referer(
+                base + "page/api/text?var.types=%5B%222903%22%5D",
+                home_ref,
+            )
+            data = json.loads(body)
+            if data.get("errorCode", -1) == 0:
+                self._log_labels_2903 = data.get("text", {})
+                self.dictionary_web_ui.update(self._log_labels_2903)
+                logger.info("Panasonic loading dictionary (List available in log debug)")
+                logger.debug(
+                    "Panasonic log dictionary (2903): %d entries received — %s",
+                    len(self._log_labels_2903),
+                    json.dumps(self._log_labels_2903, ensure_ascii=False),
+                )
+        except Exception as e:
+            logger.warning("Failed to fetch log dictionary (2903): %s", e)
+
+        self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
 
     async def fetch_log_items(self, token: str, log_labels_2903: dict[str, str]):
         """

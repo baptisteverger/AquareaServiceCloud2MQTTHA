@@ -229,8 +229,8 @@
     "name": "Priority",
     "kind": "basic",
     "values": {
-      "0x01": "2010-0182",
-      "0x02": "2010-0183"
+      "0x01": "Quiet",
+      "0x02": "Capacity"
     }
   },
   "function-setting-user-select-030": {
