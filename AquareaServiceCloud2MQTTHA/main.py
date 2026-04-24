@@ -13,6 +13,7 @@ if sys.platform == "win32":
 import asyncio
 import json
 import logging
+import os
 import platform
 import signal
 from pathlib import Path
@@ -24,7 +25,7 @@ CONFIG_FILE_OTHER = "/data/options.json"
 CONFIG_FILE_WINDOWS = "options.json"
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO,  # updated after config load below
     format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s",
     datefmt="%Y/%m/%d %H:%M:%S",
 )
@@ -40,6 +41,8 @@ def read_config() -> dict:
 
 async def main():
     config = read_config()
+    log_level = getattr(logging, config.get("LogLevel", "INFO").upper(), logging.INFO)
+    logging.getLogger().setLevel(log_level)
 
     data_queue: asyncio.Queue = asyncio.Queue(maxsize=200)
     command_queue: asyncio.Queue = asyncio.Queue(maxsize=10)
