@@ -11,6 +11,15 @@ from aquarea_types import AquareaEndUserJSON, AquareaLogDataJSON
 logger = logging.getLogger(__name__)
 
 
+def _format_val(val) -> str:
+    """Format a numeric value avoiding float precision artifacts."""
+    if isinstance(val, float) and val == int(val):
+        return str(int(val))
+    elif isinstance(val, float):
+        return f"{val:.2f}".rstrip('0').rstrip('.')
+    return str(val)
+
+
 class AquareaDeviceStatisticsMixin:
 
     async def get_device_log_information(
@@ -54,17 +63,13 @@ class AquareaDeviceStatisticsMixin:
                 name = item.name
                 if item.unit:
                     stats[f"aquarea/{user.gwid}/log/{name}/unit"] = item.unit
-                val = item.values.get(str(val), str(val))
+                # Format float BEFORE looking up in values dict
+                # (values.get converts to str, losing float type)
+                str_val = item.values.get(str(val), _format_val(val))
             else:
                 name = f"item{i:03d}"
+                str_val = _format_val(val)
 
-            # Round floats to avoid precision artifacts (e.g. 14.200000000000001)
-            if isinstance(val, float) and val == int(val):
-                str_val = str(int(val))
-            elif isinstance(val, float):
-                str_val = f"{val:.2f}".rstrip('0').rstrip('.')
-            else:
-                str_val = str(val)
             stats[f"aquarea/{user.gwid}/log/{name}"] = str_val
 
         stats[f"aquarea/{user.gwid}/log/Timestamp"] = str(last_key)
