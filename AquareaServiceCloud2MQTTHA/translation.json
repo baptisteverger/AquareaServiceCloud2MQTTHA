@@ -126,7 +126,8 @@
     "values": {
       "0x01": "2010-00D7",
       "0x02": "2010-00DC"
-    }
+    },
+    "label_code": "2010-0078"
   },
   "function-setting-user-select-005": {
     "name": "OperationMode",
@@ -139,32 +140,38 @@
       "0x0B": "2010-00F5",
       "0x0C": "2010-00FA",
       "0x0D": "2010-00FF"
-    }
+    },
+    "label_code": "2010-007D"
   },
   "function-setting-user-select-008": {
     "name": "Zone1TargetTemperatureHeat",
     "kind": "placeholder",
-    "unit": "°C"
+    "unit": "°C",
+    "label_code": "2010-0082"
   },
   "function-setting-user-select-009": {
     "name": "Zone2TargetTemperatureHeat",
     "kind": "placeholder",
-    "unit": "°C"
+    "unit": "°C",
+    "label_code": "2010-0082"
   },
   "function-setting-user-select-010": {
     "name": "Zone1TargetTemperatureCool",
     "kind": "placeholder",
-    "unit": "°C"
+    "unit": "°C",
+    "label_code": "2010-0082"
   },
   "function-setting-user-select-011": {
     "name": "Zone2TargetTemperatureCool",
     "kind": "placeholder",
-    "unit": "°C"
+    "unit": "°C",
+    "label_code": "2010-0082"
   },
   "function-setting-user-select-013": {
     "name": "TankTargetTemperature",
     "kind": "placeholder",
-    "unit": "°C"
+    "unit": "°C",
+    "label_code": "2010-0087"
   },
   "function-setting-user-select-015": {
     "name": "ZoneOperationSetting",
@@ -173,7 +180,8 @@
       "0x01": "2010-0122",
       "0x02": "2010-0127",
       "0x03": "2010-012C"
-    }
+    },
+    "label_code": "2010-008C"
   },
   "function-setting-user-select-018": {
     "name": "ForceDHW",
@@ -181,7 +189,8 @@
     "values": {
       "0x01": "2010-0136",
       "0x02": "2010-013B"
-    }
+    },
+    "label_code": "2010-0091"
   },
   "function-setting-user-select-020": {
     "name": "WeeklyTimer",
@@ -189,7 +198,8 @@
     "values": {
       "0x01": "2010-0140",
       "0x02": "2010-0145"
-    }
+    },
+    "label_code": "2010-0096"
   },
   "function-setting-user-select-022": {
     "name": "HolidayMode",
@@ -197,7 +207,8 @@
     "values": {
       "0x01": "2010-014A",
       "0x02": "2010-014F"
-    }
+    },
+    "label_code": "2010-009B"
   },
   "function-setting-user-select-023": {
     "name": "HolidayModeHeatShiftTemp",
@@ -213,7 +224,8 @@
     "values": {
       "0x01": "2010-0168",
       "0x02": "2010-016D"
-    }
+    },
+    "label_code": "2010-00A0"
   },
   "function-setting-user-select-028": {
     "name": "QuietMode",
@@ -223,15 +235,17 @@
       "0x02": "2010-0177",
       "0x03": "2010-017C",
       "0x04": "2010-0181"
-    }
+    },
+    "label_code": "2010-00A5"
   },
   "function-setting-user-select-029": {
     "name": "Priority",
     "kind": "basic",
     "values": {
-      "0x01": "Quiet",
-      "0x02": "Capacity"
-    }
+      "0x01": "2010-0182",
+      "0x02": "2010-0183"
+    },
+    "label_code": "2010-00A5"
   },
   "function-setting-user-select-030": {
     "name": "RoomHeater",
@@ -239,7 +253,8 @@
     "values": {
       "0x01": "2010-0186",
       "0x02": "2010-018B"
-    }
+    },
+    "label_code": "2010-00AA"
   },
   "function-setting-user-select-032": {
     "name": "TankHeater",
@@ -247,14 +262,16 @@
     "values": {
       "0x01": "2010-0190",
       "0x02": "2010-0195"
-    }
+    },
+    "label_code": "2010-00AF"
   },
   "function-setting-user-select-034": {
     "name": "Sterilization",
     "kind": "basic",
     "values": {
       "0x01": "2010-019A"
-    }
+    },
+    "label_code": "2010-00B4"
   },
   "function-setting-user-select-035": {
     "name": "TankSensor",
@@ -262,7 +279,8 @@
     "values": {
       "0x01": "2010-0197",
       "0x02": "2010-0198"
-    }
+    },
+    "label_code": "2010-00B7"
   },
   "function-setting-user-select-036": {
     "name": "Powerful",
@@ -272,7 +290,8 @@
       "0x02": "2010-01A9",
       "0x03": "2010-01AE",
       "0x04": "2010-01B3"
-    }
+    },
+    "label_code": "2010-00B9"
   },
   "function-setting-user-select-038": {
     "name": "ForceHeater",
@@ -280,14 +299,16 @@
     "values": {
       "0x01": "2010-01B8",
       "0x02": "2010-01BD"
-    }
+    },
+    "label_code": "2010-00BE"
   },
   "function-setting-user-select-040": {
     "name": "ForceDefrost",
     "kind": "basic",
     "values": {
       "0x01": "2010-01C2"
-    }
+    },
+    "label_code": "2010-00C3"
   },
   "auto-2zonemixingvalve1opening": {
     "name": "2ZoneMixingValve1Opening",

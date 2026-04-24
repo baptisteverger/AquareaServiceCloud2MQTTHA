@@ -2,8 +2,9 @@
 MQTT Home Assistant discovery — equivalent of mqttDiscovery.go
 
 Settings discovery:
-  - 1-2 options contenant On/Off/Request  → switch HA
-  - 3+ options, ou 2 options sans On/Off  → select HA
+  - single "Request" option           → button HA
+  - 1-2 options with On/Off/Request   → switch HA
+  - 3+ options, or 2 without On/Off   → select HA
 """
 
 import json
@@ -13,7 +14,7 @@ from dataclasses import dataclass, field, asdict
 from aquarea_types import AquareaEndUserJSON
 
 # ---------------------------------------------------------------------------
-# Chargement du mapping nom → unité depuis translation.json
+# Unit map from translation.json
 # ---------------------------------------------------------------------------
 _TRANSLATION_PATH = os.path.join(os.path.dirname(__file__), "translation.json")
 
@@ -33,7 +34,7 @@ UNIT_MAP: dict[str, str] = _load_unit_map()
 
 
 # ---------------------------------------------------------------------------
-# Dataclasses HA discovery
+# Dataclasses
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -52,11 +53,8 @@ def _panasonic(device_id: str) -> _Device:
     )
 
 def _clean(d: dict) -> dict:
-    """Retire les champs falsy, SAUF les listes (même vides on les garde)."""
-    return {
-        k: v for k, v in d.items()
-        if v or (isinstance(v, list))
-    }
+    """Remove falsy fields, but keep lists (even empty)."""
+    return {k: v for k, v in d.items() if v or isinstance(v, list)}
 
 @dataclass
 class MqttSwitch:
@@ -71,12 +69,22 @@ class MqttSwitch:
 
 @dataclass
 class MqttSelect:
-    """HA MQTT select — pour les settings à choix multiples."""
+    """HA MQTT select — for multi-option settings."""
     name: str = ""
     availability_topic: str = ""
     command_topic: str = ""
     state_topic: str = ""
     options: list = field(default_factory=list)
+    unique_id: str = ""
+    device: _Device = field(default_factory=_Device)
+
+@dataclass
+class MqttButton:
+    """HA MQTT button — for one-shot actions (Request)."""
+    name: str = ""
+    availability_topic: str = ""
+    command_topic: str = ""
+    payload_press: str = ""
     unique_id: str = ""
     device: _Device = field(default_factory=_Device)
 
@@ -111,7 +119,7 @@ def _to_json(obj) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Encodeurs individuels
+# Individual encoders
 # ---------------------------------------------------------------------------
 
 def encode_binary_sensor(name: str, device_id: str, state_topic: str) -> tuple[str, str]:
@@ -142,7 +150,7 @@ def encode_sensor(name: str, device_id: str, state_topic: str, unit: str = "") -
 
 
 def encode_switch(name: str, device_id: str, state_topic: str, values: list[str]) -> tuple[str, str]:
-    """Switch On/Off. Lève ValueError si aucune valeur On/Off/Request trouvée."""
+    """Binary On/Off switch. Raises ValueError if no On/Off/Request found."""
     safe = name.replace(" ", "_")
     b = MqttSwitch(
         name=name,
@@ -171,7 +179,7 @@ def encode_switch(name: str, device_id: str, state_topic: str, values: list[str]
 
 
 def encode_select(name: str, device_id: str, state_topic: str, options: list[str]) -> tuple[str, str]:
-    """Select multi-options."""
+    """Multi-option select."""
     safe = name.replace(" ", "_")
     s = MqttSelect(
         name=name,
@@ -186,19 +194,8 @@ def encode_select(name: str, device_id: str, state_topic: str, options: list[str
     return ha_topic, _to_json(s)
 
 
-@dataclass
-class MqttButton:
-    """HA MQTT button — pour les actions ponctuelles (Request)."""
-    name: str = ""
-    availability_topic: str = ""
-    command_topic: str = ""
-    payload_press: str = ""
-    unique_id: str = ""
-    device: _Device = field(default_factory=_Device)
-
-
 def encode_button(name: str, device_id: str, state_topic: str, payload: str) -> tuple[str, str]:
-    """Bouton HA pour actions ponctuelles (Sterilization, ForceDefrost)."""
+    """One-shot button (Sterilization, ForceDefrost)."""
     safe = name.replace(" ", "_")
     b = MqttButton(
         name=name,
@@ -213,18 +210,19 @@ def encode_button(name: str, device_id: str, state_topic: str, payload: str) -> 
 
 
 # ---------------------------------------------------------------------------
-# Mixin principal
+# Main mixin
 # ---------------------------------------------------------------------------
 
 class AquareaDiscoveryMixin:
 
     def encode_switches(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
         """
-        Génère la discovery HA pour tous les settings Aquarea.
+        Generate HA discovery for all Aquarea settings.
 
-        Routing par type:
-          - ≤2 options dont On/Off/Request  → switch HA
-          - tout le reste                   → select HA
+        Routing:
+          - single "Request" option          → button
+          - ≤2 options with On/Off/Request   → switch
+          - everything else                  → select
         """
         config: dict[str, str] = {}
 
@@ -240,31 +238,30 @@ class AquareaDiscoveryMixin:
             name = parts[3]
             state_topic = k.removesuffix("/options")
 
+            # Use translated label from account language if published, else internal name
+            label = topics.get(state_topic + "/label", name)
+
             values = [opt.strip() for opt in v.split("\n") if opt.strip()]
             if not values:
                 continue
 
-            has_on_off = any(
-                "Off" in val or "On" in val or "Request" in val or "Demande" in val
-                for val in values
-            )
-
-            # Cas bouton : une seule option action (Request/Demande) → HA button
-            if len(values) == 1 and values[0] in ("Request", "Demande"):
-                ha_topic, ha_data = encode_button(name, device_id, state_topic, "Request")
+            # Single "Request" → button
+            if len(values) == 1 and "Request" in values[0]:
+                ha_topic, ha_data = encode_button(label, device_id, state_topic, values[0])
                 config[ha_topic] = ha_data
-            elif len(values) <= 2 and has_on_off:
-                # Tentative switch binaire
+                continue
+
+            has_on_off = any("Off" in val or "On" in val for val in values)
+
+            if len(values) <= 2 and has_on_off:
                 try:
-                    ha_topic, ha_data = encode_switch(name, device_id, state_topic, values)
+                    ha_topic, ha_data = encode_switch(label, device_id, state_topic, values)
                     config[ha_topic] = ha_data
                 except ValueError:
-                    # Fallback select
-                    ha_topic, ha_data = encode_select(name, device_id, state_topic, values)
+                    ha_topic, ha_data = encode_select(label, device_id, state_topic, values)
                     config[ha_topic] = ha_data
             else:
-                # Select multi-choix (modes, niveaux, etc.)
-                ha_topic, ha_data = encode_select(name, device_id, state_topic, values)
+                ha_topic, ha_data = encode_select(label, device_id, state_topic, values)
                 config[ha_topic] = ha_data
 
         return config
@@ -273,7 +270,7 @@ class AquareaDiscoveryMixin:
         config: dict[str, str] = {}
         no_dupes: dict[str, str] = {}
 
-        # Déduplification : garder /unit si présent, sinon valeur brute
+        # De-duplicate: prefer /unit topic when present
         for k, v in topics.items():
             if "/log/" not in k and "/state/" not in k:
                 continue

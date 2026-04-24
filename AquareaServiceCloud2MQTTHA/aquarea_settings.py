@@ -107,6 +107,11 @@ class AquareaSettingsMixin:
 
             if value is not None:
                 settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
+                # Publish translated label so HA entity name follows account language
+                label_code = getattr(translation, 'label_code', None)
+                if label_code:
+                    label = self.dictionary_web_ui.get(label_code, translation.name)
+                    settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label
         logger.info("Get new Panasonic settings data for device %s", user.gwid)
         logger.debug(
             "Panasonic settings data for device %s (%d values): %s",
