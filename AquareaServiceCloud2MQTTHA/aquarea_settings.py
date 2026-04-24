@@ -123,12 +123,13 @@ class AquareaSettingsMixin:
 
                 if value is not None:
                     settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
-                    # Always publish a label — translated if label_code exists, else use internal name
+                    # Always publish a label (priority: API translation > display_name > internal name)
                     label_code = getattr(translation, "label_code", "")
+                    display_name = getattr(translation, "display_name", "")
                     if label_code:
-                        label = self.dictionary_web_ui.get(label_code, translation.name)
+                        label = self.dictionary_web_ui.get(label_code, display_name or translation.name)
                     else:
-                        label = translation.name
+                        label = display_name or translation.name
                     settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label
 
             else:

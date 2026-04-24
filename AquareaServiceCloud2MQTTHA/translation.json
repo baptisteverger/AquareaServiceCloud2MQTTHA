@@ -147,31 +147,36 @@
     "name": "Zone1TargetTemperatureHeat",
     "kind": "placeholder",
     "unit": "°C",
-    "label_code": "2010-0082"
+    "label_code": "2010-0082",
+    "display_name": "Zone 1 target temperature heat"
   },
   "function-setting-user-select-009": {
     "name": "Zone2TargetTemperatureHeat",
     "kind": "placeholder",
     "unit": "°C",
-    "label_code": "2010-0082"
+    "label_code": "2010-0082",
+    "display_name": "Zone 2 target temperature heat"
   },
   "function-setting-user-select-010": {
     "name": "Zone1TargetTemperatureCool",
     "kind": "placeholder",
     "unit": "°C",
-    "label_code": "2010-0082"
+    "label_code": "2010-0082",
+    "display_name": "Zone 1 target temperature cool"
   },
   "function-setting-user-select-011": {
     "name": "Zone2TargetTemperatureCool",
     "kind": "placeholder",
     "unit": "°C",
-    "label_code": "2010-0082"
+    "label_code": "2010-0082",
+    "display_name": "Zone 2 target temperature cool"
   },
   "function-setting-user-select-013": {
     "name": "TankTargetTemperature",
     "kind": "placeholder",
     "unit": "°C",
-    "label_code": "2010-0087"
+    "label_code": "2010-0087",
+    "display_name": "Tank target temperature"
   },
   "function-setting-user-select-015": {
     "name": "ZoneOperationSetting",
@@ -212,11 +217,13 @@
   },
   "function-setting-user-select-023": {
     "name": "HolidayModeHeatShiftTemp",
-    "kind": "placeholder"
+    "kind": "placeholder",
+    "display_name": "Holiday mode heat shift temp"
   },
   "function-setting-user-select-024": {
     "name": "HolidayModeTankShiftTemp",
-    "kind": "placeholder"
+    "kind": "placeholder",
+    "display_name": "Holiday mode tank shift temp"
   },
   "function-setting-user-select-026": {
     "name": "QuietTimer",

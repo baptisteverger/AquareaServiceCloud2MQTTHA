@@ -23,7 +23,8 @@ class AquareaFunctionDescription:
     kind: str = ""
     values: dict[str, str] = field(default_factory=dict)
     reverse_values: dict[str, str] = field(default_factory=dict)
-    label_code: str = ""  # 2010-xxxx code whose translation gives the HA entity name
+    label_code: str = ""    # 2010-xxxx code whose translation gives the HA entity name
+    display_name: str = ""  # static fallback label if no label_code
 
     def __post_init__(self):
         if self.values and not self.reverse_values:
@@ -38,6 +39,7 @@ class AquareaFunctionDescription:
             values=values,
             reverse_values={v: k for k, v in values.items()},
             label_code=d.get("label_code", ""),
+            display_name=d.get("display_name", ""),
         )
 
 
