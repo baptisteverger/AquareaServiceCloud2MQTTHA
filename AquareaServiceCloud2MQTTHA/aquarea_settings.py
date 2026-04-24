@@ -77,41 +77,65 @@ class AquareaSettingsMixin:
         self.aquarea_settings = AquareaFunctionSettingGetJSON.from_dict(json.loads(b))
         settings: dict[str, str] = {}
 
+        # Log params{} of each setting — helps understand if options can be made dynamic
+        logger.debug(
+            "settingDataInfo structure for %s: %s",
+            user.gwid,
+            json.dumps(
+                {k: {"type": v.type, "selected": v.selected_value, "params": v.params}
+                 for k, v in self.aquarea_settings.setting_data_info.items()
+                 if "user" in k},
+                ensure_ascii=False,
+            ),
+        )
+
         for key, val in self.aquarea_settings.setting_data_info.items():
             if "user" not in key:
                 continue
-            if key not in self.translation:
-                continue
 
-            translation = self.translation[key]
-            value = None
+            if key in self.translation:
+                # --- Known setting: use translation.json structure ---
+                translation = self.translation[key]
+                value = None
 
-            if val.type == "basic-text":
-                value = self.dictionary_web_ui.get(val.text_value, "")
-            elif val.type == "select":
-                if translation.kind == "basic":
-                    raw = translation.values.get(val.selected_value, "")
-                    value = self.dictionary_web_ui.get(raw, raw)
-                    options = "\n".join(
-                        self.dictionary_web_ui.get(opt, opt)
-                        for opt in translation.values.values()
-                    )
-                    settings[f"aquarea/{user.gwid}/settings/{translation.name}/options"] = options
-                elif translation.kind == "placeholder":
-                    i = int(val.selected_value, 0)
-                    if "HolidayMode" not in translation.name:
-                        i -= 128
-                    value = str(int.from_bytes((i & 0xFF).to_bytes(1, "big"), "big", signed=True))
-            elif val.type == "placeholder-text":
-                value = val.placeholder
+                if val.type == "basic-text":
+                    value = self.dictionary_web_ui.get(val.text_value, "")
+                elif val.type == "select":
+                    if translation.kind == "basic":
+                        raw = translation.values.get(val.selected_value, "")
+                        value = self.dictionary_web_ui.get(raw, raw)
+                        options = "\n".join(
+                            self.dictionary_web_ui.get(opt, opt)
+                            for opt in translation.values.values()
+                        )
+                        settings[f"aquarea/{user.gwid}/settings/{translation.name}/options"] = options
+                    elif translation.kind == "placeholder":
+                        i = int(val.selected_value, 0)
+                        if "HolidayMode" not in translation.name:
+                            i -= 128
+                        value = str(int.from_bytes((i & 0xFF).to_bytes(1, "big"), "big", signed=True))
+                elif val.type == "placeholder-text":
+                    value = val.placeholder
 
-            if value is not None:
-                settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
-                # Publish translated label so HA entity name follows account language
-                label_code = getattr(translation, 'label_code', None)
-                if label_code:
-                    label = self.dictionary_web_ui.get(label_code, translation.name)
-                    settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label
+                if value is not None:
+                    settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
+                    # Publish translated label so HA entity name follows account language
+                    label_code = getattr(translation, "label_code", None)
+                    if label_code:
+                        label = self.dictionary_web_ui.get(label_code, translation.name)
+                        settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label
+
+            else:
+                # --- Unknown setting: passthrough using dictionary_web_ui ---
+                # Works for any heat pump model without changes to translation.json.
+                # We publish the current value translated via the 2010 dictionary.
+                # We cannot generate a select/switch without the full options list,
+                # so this publishes a read-only sensor — better than nothing.
+                if val.selected_value:
+                    internal_name = key.replace("function-setting-user-select-", "setting-")
+                    value = self.dictionary_web_ui.get(val.selected_value, val.selected_value)
+                    settings[f"aquarea/{user.gwid}/settings/{internal_name}"] = value
+                    logger.debug("Passthrough unknown setting %s (%s) = %s", key, internal_name, value)
         logger.info("Get new Panasonic settings data for device %s", user.gwid)
         logger.debug(
             "Panasonic settings data for device %s (%d values): %s",
