@@ -1,5 +1,5 @@
 name: "AquareaServiceCloud2MQTTHA"
-version: "1.1.07"
+version: "1.1.08"
 slug: "aquareaservicecloud2mqqtha"
 description: "Panasonic Aquarea Service Cloud to MQTT gateway (Python port)"
 url: "https://github.com/baptisteverger/AquareaServiceCloud2MQTTHA"
@@ -26,6 +26,7 @@ options:
   MqttClientID: "aquarea"
   MqttKeepalive: "60"
   LogLevel: "INFO"
+  Language: "en"
 schema:
   AquareaServiceCloudURL: str
   AquareaServiceCloudLogin: str
@@ -40,3 +41,4 @@ schema:
   MqttClientID: str
   MqttKeepalive: str
   LogLevel: str
+  Language: str

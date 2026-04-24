@@ -17,6 +17,43 @@ HEADERS_BASE = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
+
+def set_language(language: str) -> None:
+    """Set Accept-Language header for all HTTP requests.
+
+    Maps a simple language code (e.g. 'fr', 'de', 'en') to a proper
+    Accept-Language header value used by all Aquarea API calls.
+    This controls the language of labels returned by the Panasonic API
+    (types 2000, 2006, 2903, 2010).
+    """
+    lang = language.lower().strip()
+    # Map short codes to full locale strings
+    lang_map = {
+        "en": "en-US,en;q=0.9",
+        "fr": "fr-FR,fr;q=0.9",
+        "de": "de-DE,de;q=0.9",
+        "es": "es-ES,es;q=0.9",
+        "it": "it-IT,it;q=0.9",
+        "nl": "nl-NL,nl;q=0.9",
+        "pl": "pl-PL,pl;q=0.9",
+        "pt": "pt-PT,pt;q=0.9",
+        "cs": "cs-CZ,cs;q=0.9",
+        "sv": "sv-SE,sv;q=0.9",
+        "fi": "fi-FI,fi;q=0.9",
+        "nb": "nb-NO,nb;q=0.9",
+        "da": "da-DK,da;q=0.9",
+        "el": "el-GR,el;q=0.9",
+        "ro": "ro-RO,ro;q=0.9",
+        "sk": "sk-SK,sk;q=0.9",
+        "sl": "sl-SI,sl;q=0.9",
+        "hr": "hr-HR,hr;q=0.9",
+        "bg": "bg-BG,bg;q=0.9",
+        "hu": "hu-HU,hu;q=0.9",
+        "tr": "tr-TR,tr;q=0.9",
+    }
+    accept_language = lang_map.get(lang, f"{lang};q=0.9")
+    HEADERS_BASE["Accept-Language"] = accept_language
+
 HEADERS_HTML = {
     "Cache-Control": "max-age=0",
     "User-Agent": (

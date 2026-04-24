@@ -18,7 +18,7 @@ from aquarea_types import (
     AquareaFunctionSettingGetJSON,
     AquareaLogItem,
 )
-from aquarea_http import AquareaHTTPMixin
+from aquarea_http import AquareaHTTPMixin, set_language
 from aquarea_login import AquareaLoginMixin
 from aquarea_settings import AquareaSettingsMixin
 from aquarea_device_status import AquareaDeviceStatusMixin
@@ -157,6 +157,11 @@ async def aquarea_handler(
     aq.aquarea_service_cloud_login = config["AquareaServiceCloudLogin"]
     aq.aquarea_service_cloud_password = config["AquareaServiceCloudPassword"]
     aq.log_sec_offset = config.get("LogSecOffset", 0)
+
+    # Set API language — controls labels returned by Panasonic (sensors, settings)
+    language = config.get("Language", "en")
+    set_language(language)
+    logger.info("API language set to: %s", language)
     aq.data_queue = data_queue
     aq.status_queue = status_queue
 
