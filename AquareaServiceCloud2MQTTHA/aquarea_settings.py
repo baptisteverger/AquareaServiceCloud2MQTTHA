@@ -123,11 +123,13 @@ class AquareaSettingsMixin:
 
                 if value is not None:
                     settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
-                    # Publish translated label so HA entity name follows account language
-                    label_code = getattr(translation, "label_code", None)
+                    # Always publish a label — translated if label_code exists, else use internal name
+                    label_code = getattr(translation, "label_code", "")
                     if label_code:
                         label = self.dictionary_web_ui.get(label_code, translation.name)
-                        settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label
+                    else:
+                        label = translation.name
+                    settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label
 
             else:
                 # --- Unknown setting: passthrough using dictionary_web_ui ---

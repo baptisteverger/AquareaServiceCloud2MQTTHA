@@ -58,7 +58,14 @@ class AquareaDeviceStatisticsMixin:
             else:
                 name = f"item{i:03d}"
 
-            stats[f"aquarea/{user.gwid}/log/{name}"] = str(val)
+            # Round floats to avoid precision artifacts (e.g. 14.200000000000001)
+            if isinstance(val, float) and val == int(val):
+                str_val = str(int(val))
+            elif isinstance(val, float):
+                str_val = f"{val:.2f}".rstrip('0').rstrip('.')
+            else:
+                str_val = str(val)
+            stats[f"aquarea/{user.gwid}/log/{name}"] = str_val
 
         stats[f"aquarea/{user.gwid}/log/Timestamp"] = str(last_key)
         stats[f"aquarea/{user.gwid}/log/CurrentError"] = str(log_data.error_code)
