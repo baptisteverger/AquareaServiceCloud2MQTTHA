@@ -21,6 +21,9 @@ _MULTI_CHOICE_RE = re.compile(r"(\d+)\s*:\s*([^,\]]+)")
 _REMOVE_PARENS_RE = re.compile(r"\(.+?\)")
 
 
+_SAFE_NAME_RE = re.compile(r'[^a-zA-Z0-9_-]')
+
+
 def _parse_log_label(raw_label: str) -> AquareaLogItem:
     label = raw_label.replace("(Actual)", "Actual").replace("(Target)", "Target")
     label = _REMOVE_PARENS_RE.sub("", label).strip()
@@ -28,9 +31,13 @@ def _parse_log_label(raw_label: str) -> AquareaLogItem:
     split = _UNIT_RE.search(label)
     if not split:
         name = label.strip().title().replace(" ", "").replace(":", "")
+        # Sanitize: remove chars that would break MQTT topic levels
+        name = _SAFE_NAME_RE.sub("-", name).strip("-")
         return AquareaLogItem(name=name, unit="", values={})
 
     name_raw = split.group(1).strip().title().replace(" ", "").replace(":", "")
+    # Sanitize: '/' and ',' create invalid MQTT topic levels
+    name_raw = _SAFE_NAME_RE.sub("-", name_raw).strip("-")
     unit_part = split.group(2).strip()
 
     choices = _MULTI_CHOICE_RE.findall(unit_part)

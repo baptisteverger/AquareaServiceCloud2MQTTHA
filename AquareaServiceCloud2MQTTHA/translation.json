@@ -244,8 +244,7 @@
     "values": {
       "0x01": "2010-0182",
       "0x02": "2010-0183"
-    },
-    "label_code": "2010-00A5"
+    }
   },
   "function-setting-user-select-030": {
     "name": "RoomHeater",

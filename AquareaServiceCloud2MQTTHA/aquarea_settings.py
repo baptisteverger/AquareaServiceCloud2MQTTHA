@@ -102,8 +102,12 @@ class AquareaSettingsMixin:
                     value = self.dictionary_web_ui.get(val.text_value, "")
                 elif val.type == "select":
                     if translation.kind == "basic":
-                        raw = translation.values.get(val.selected_value, "")
-                        value = self.dictionary_web_ui.get(raw, raw)
+                        if val.selected_value == "----":
+                            # Idle state for one-shot actions (Sterilization, ForceDefrost)
+                            value = "----"
+                        else:
+                            raw = translation.values.get(val.selected_value, "")
+                            value = self.dictionary_web_ui.get(raw, raw)
                         options = "\n".join(
                             self.dictionary_web_ui.get(opt, opt)
                             for opt in translation.values.values()
