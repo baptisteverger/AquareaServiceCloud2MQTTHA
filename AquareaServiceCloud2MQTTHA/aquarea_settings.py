@@ -130,7 +130,7 @@ class AquareaSettingsMixin:
                         label = self.dictionary_web_ui.get(label_code, display_name or translation.name)
                     else:
                         label = display_name or translation.name
-                    settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label
+                    settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label.strip()
 
             else:
                 # --- Unknown setting: passthrough using dictionary_web_ui ---
