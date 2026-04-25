@@ -1,380 +1,182 @@
 """
-MQTT Home Assistant discovery — equivalent of mqttDiscovery.go
-
-Settings discovery:
-  - single "Request" option           → button HA
-  - 1-2 options with On/Off/Request   → switch HA
-  - 3+ options, or 2 without On/Off   → select HA
+Device settings — equivalent of aquareaDeviceSettings.go
 """
 
 import json
 import logging
-import re
-import os
-from dataclasses import dataclass, field, asdict
-from aquarea_types import AquareaEndUserJSON
+
+from aquarea_types import AquareaCommand, AquareaEndUserJSON, AquareaFunctionSettingGetJSON
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Unit map from translation.json
-# ---------------------------------------------------------------------------
-_TRANSLATION_PATH = os.path.join(os.path.dirname(__file__), "translation.json")
 
-def _load_unit_map(path: str = _TRANSLATION_PATH) -> dict[str, str]:
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        return {}
-    return {
-        v["name"]: v["unit"]
-        for v in data.values()
-        if "name" in v and "unit" in v
-    }
+class AquareaSettingsMixin:
 
-UNIT_MAP: dict[str, str] = _load_unit_map()
+    async def send_setting(self, cmd: AquareaCommand) -> None:
+        if cmd.value == "----":
+            return
+        if not self.aquarea_settings.settings_background_data:
+            return
 
+        function_name = self.reverse_translation.get(cmd.setting)
+        if not function_name:
+            logger.warning(
+                "Received command for unknown setting '%s' (device %s, value '%s') — "
+                "no matching entry in translation.json, command ignored",
+                cmd.setting, cmd.device_id, cmd.value,
+            )
+            return
 
-# ---------------------------------------------------------------------------
-# Dataclasses
-# ---------------------------------------------------------------------------
+        function_name_post = function_name.replace(
+            "function-setting-user-select-", "userSelect"
+        )
+        function_info = self.translation.get(function_name)
+        value = cmd.value
 
-@dataclass
-class _Device:
-    manufacturer: str = ""
-    model: str = ""
-    name: str = ""
-    identifiers: str = ""
-
-def _panasonic(device_id: str) -> _Device:
-    return _Device(
-        manufacturer="Panasonic",
-        model="Aquarea",
-        identifiers=device_id,
-        name=f"Aquarea {device_id}",
-    )
-
-def _clean(d: dict) -> dict:
-    """Remove falsy fields, but keep lists (even empty)."""
-    return {k: v for k, v in d.items() if v or isinstance(v, list)}
-
-@dataclass
-class MqttSwitch:
-    name: str = ""
-    availability_topic: str = ""
-    command_topic: str = ""
-    state_topic: str = ""
-    payload_on: str = ""
-    payload_off: str = ""
-    unique_id: str = ""
-    device: _Device = field(default_factory=_Device)
-
-@dataclass
-class MqttSelect:
-    """HA MQTT select — for multi-option settings."""
-    name: str = ""
-    availability_topic: str = ""
-    command_topic: str = ""
-    state_topic: str = ""
-    options: list = field(default_factory=list)
-    unique_id: str = ""
-    device: _Device = field(default_factory=_Device)
-
-@dataclass
-class MqttButton:
-    """HA MQTT button — for one-shot actions (Request)."""
-    name: str = ""
-    availability_topic: str = ""
-    command_topic: str = ""
-    payload_press: str = ""
-    unique_id: str = ""
-    device: _Device = field(default_factory=_Device)
-
-@dataclass
-class MqttNumber:
-    """HA MQTT number — for writable numeric settings (temperatures, shifts)."""
-    name: str = ""
-    availability_topic: str = ""
-    state_topic: str = ""
-    command_topic: str = ""
-    unit_of_measurement: str = ""
-    unique_id: str = ""
-    device: _Device = field(default_factory=_Device)
-
-@dataclass
-class MqttSensor:
-    name: str = ""
-    availability_topic: str = ""
-    state_topic: str = ""
-    unit_of_measurement: str = ""
-    device_class: str = ""
-    force_update: bool = False
-    unique_id: str = ""
-    device: _Device = field(default_factory=_Device)
-
-@dataclass
-class MqttBinarySensor:
-    name: str = ""
-    availability_topic: str = ""
-    state_topic: str = ""
-    device_class: str = ""
-    force_update: bool = False
-    payload_off: str = ""
-    payload_on: str = ""
-    unique_id: str = ""
-    device: _Device = field(default_factory=_Device)
-
-
-def _to_json(obj) -> str:
-    d = asdict(obj)
-    d["device"] = _clean(d["device"])
-    return json.dumps(_clean(d))
-
-
-# ---------------------------------------------------------------------------
-# Individual encoders
-# ---------------------------------------------------------------------------
-
-def encode_binary_sensor(name: str, device_id: str, state_topic: str) -> tuple[str, str]:
-    safe = name.replace(" ", "_")
-    s = MqttBinarySensor(
-        name=name,
-        availability_topic="aquarea/status",
-        state_topic=state_topic,
-        payload_on="On",
-        payload_off="Off",
-        unique_id=f"{device_id}_{safe}",
-        device=_panasonic(device_id),
-    )
-    return "", _to_json(s)
-
-
-def encode_sensor(name: str, device_id: str, state_topic: str, unit: str = "", device_class: str = "") -> tuple[str, str]:
-    safe = name.replace(" ", "_")
-    s = MqttSensor(
-        name=name,
-        availability_topic="aquarea/status",
-        state_topic=state_topic,
-        unit_of_measurement=unit,
-        device_class=device_class,
-        unique_id=f"{device_id}_{safe}",
-        device=_panasonic(device_id),
-    )
-    return "", _to_json(s)
-
-
-def encode_switch(name: str, device_id: str, state_topic: str, values: list[str]) -> tuple[str, str]:
-    """Binary On/Off switch. Raises ValueError if no On/Off/Request found."""
-    safe = name.replace(" ", "_")
-    b = MqttSwitch(
-        name=name,
-        availability_topic="aquarea/status",
-        command_topic=state_topic + "/set",
-        state_topic=state_topic,
-        unique_id=f"{device_id}_{safe}",
-        device=_panasonic(device_id),
-    )
-    found = False
-    for v in values:
-        vs = v.strip()
-        if "Off" in vs:
-            b.payload_off = vs
-            found = True
-        if "On" in vs:
-            b.payload_on = vs
-            found = True
-        if "Request" in vs:
-            b.payload_on = vs
-            found = True
-    if not found:
-        raise ValueError(f"Cannot encode switch: {values}")
-    ha_topic = f"homeassistant/switch/{device_id}/{safe}/config"
-    return ha_topic, _to_json(b)
-
-
-def encode_select(name: str, device_id: str, state_topic: str, options: list[str]) -> tuple[str, str]:
-    """Multi-option select."""
-    safe = name.replace(" ", "_")
-    s = MqttSelect(
-        name=name,
-        availability_topic="aquarea/status",
-        command_topic=state_topic + "/set",
-        state_topic=state_topic,
-        options=[o.strip() for o in options if o.strip()],
-        unique_id=f"{device_id}_{safe}",
-        device=_panasonic(device_id),
-    )
-    ha_topic = f"homeassistant/select/{device_id}/{safe}/config"
-    return ha_topic, _to_json(s)
-
-
-def encode_button(name: str, device_id: str, state_topic: str, payload: str) -> tuple[str, str]:
-    """One-shot button (Sterilization, ForceDefrost)."""
-    safe = name.replace(" ", "_")
-    b = MqttButton(
-        name=name,
-        availability_topic="aquarea/status",
-        command_topic=state_topic + "/set",
-        payload_press=payload,
-        unique_id=f"{device_id}_{safe}",
-        device=_panasonic(device_id),
-    )
-    ha_topic = f"homeassistant/button/{device_id}/{safe}/config"
-    return ha_topic, _to_json(b)
-
-
-def encode_number(name: str, device_id: str, state_topic: str, unit: str = "") -> tuple[str, str]:
-    """Writable numeric setting (temperatures, shift values)."""
-    safe = name.replace(" ", "_")
-    n = MqttNumber(
-        name=name,
-        availability_topic="aquarea/status",
-        state_topic=state_topic,
-        command_topic=state_topic + "/set",
-        unit_of_measurement=unit,
-        unique_id=f"{device_id}_{safe}",
-        device=_panasonic(device_id),
-    )
-    ha_topic = f"homeassistant/number/{device_id}/{safe}/config"
-    return ha_topic, _to_json(n)
-
-
-# ---------------------------------------------------------------------------
-# Main mixin
-# ---------------------------------------------------------------------------
-
-class AquareaDiscoveryMixin:
-
-    def encode_switches(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
-        """
-        Generate HA discovery for all Aquarea settings.
-
-        Routing:
-          - single "Request" option          → button
-          - ≤2 options with On/Off/Request   → switch
-          - everything else with options     → select
-          - no options + numeric value       → number
-        """
-        config: dict[str, str] = {}
-
-        # Collect settings that have /options (button/switch/select)
-        settings_with_options: set[str] = set()
-        for k in topics:
-            if "/settings/" in k and k.endswith("/options"):
-                parts = k.split("/")
-                if len(parts) >= 4:
-                    settings_with_options.add(parts[3])
-
-        for k, v in topics.items():
-            if "/settings/" not in k:
-                continue
-            if k.endswith("/options") or k.endswith("/label"):
-                continue
-
-            parts = k.split("/")
-            if len(parts) < 4:
-                continue
-
-            device_id = parts[1]
-            name = parts[3]
-            state_topic = k
-            label = topics.get(state_topic + "/label", name)
-
-            # No /options → number if value is numeric
-            if name not in settings_with_options:
+        if function_info:
+            if function_info.kind == "basic":
+                value = self.reverse_dictionary_web_ui.get(value, value)
+                value = function_info.reverse_values.get(value, value)
+            elif function_info.kind == "placeholder":
                 try:
-                    float(v)
-                except (ValueError, TypeError):
-                    continue
-                tr_entry = next(
-                    (e for e in self.translation.values() if e.name == name), None
-                )
-                unit = tr_entry.unit if tr_entry and hasattr(tr_entry, "unit") and tr_entry.unit else ""
-                ha_topic, ha_data = encode_number(label, device_id, state_topic, unit)
-                config[ha_topic] = ha_data
+                    i = int(value, 0)
+                except (ValueError, OverflowError):
+                    logger.warning(
+                        "Ignoring command for '%s': expected numeric value, got '%s'",
+                        cmd.setting, value,
+                    )
+                    return
+                if "HolidayMode" not in cmd.setting:
+                    i += 128
+                value = f"0x{i & 0xFF:X}"
+
+        user = self.users_map.get(cmd.device_id)
+        if not user:
+            return
+
+        token = await self.get_end_user_shiesuahruefutohkun(user)
+        bg = self.aquarea_settings.settings_background_data
+
+        await self.http_post_with_referer(
+            self.aquarea_service_cloud_url + "installer/api/function/setting/user/set",
+            self.aquarea_service_cloud_url + "installer/functionSetting",
+            {
+                "var.deviceId": user.device_id,
+                "var.preOperation": bg.get("0x80", {}).get("value", ""),
+                "var.preMode": bg.get("0xE0", {}).get("value", ""),
+                "var.preTank": bg.get("0xE1", {}).get("value", ""),
+                f"var.{function_name_post}": value,
+                "shiesuahruefutohkun": token,
+            },
+        )
+
+    async def get_device_settings(
+        self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
+    ) -> dict[str, str]:
+        base = self.aquarea_service_cloud_url
+
+        # The browser performs a client-side SPA route change from functionStatus →
+        # functionSetting (no network HTML request), so the next XHR carries
+        # Referer: installer/functionSetting.  We must replicate that referer here.
+        ref = base + "installer/functionSetting"
+
+        b = await self.http_post_with_referer(
+            base + "installer/api/function/setting/get",
+            ref,
+            {"var.deviceId": user.device_id, "shiesuahruefutohkun": shiesuahruefutohkun},
+        )
+
+        self.aquarea_settings = AquareaFunctionSettingGetJSON.from_dict(json.loads(b))
+        settings: dict[str, str] = {}
+
+        # Log the FULL raw response for placeholder settings so we can discover
+        # what fields Panasonic sends (selectParams, range, min, max, values, etc.)
+        raw_data = json.loads(b)
+        raw_setting_info = raw_data.get("settingDataInfo", {})
+        placeholder_keys = {
+            k for k, v in self.translation.items()
+            if getattr(v, "kind", "") == "placeholder"
+        }
+        logger.debug(
+            "RAW settingDataInfo for placeholder settings on device %s: %s",
+            user.gwid,
+            json.dumps(
+                {k: raw_setting_info[k] for k in placeholder_keys if k in raw_setting_info},
+                ensure_ascii=False,
+            ),
+        )
+
+        # Log params{} of each setting — helps understand if options can be made dynamic
+        logger.debug(
+            "settingDataInfo structure for %s: %s",
+            user.gwid,
+            json.dumps(
+                {k: {"type": v.type, "selected": v.selected_value, "params": v.params}
+                 for k, v in self.aquarea_settings.setting_data_info.items()
+                 if "user" in k},
+                ensure_ascii=False,
+            ),
+        )
+
+        for key, val in self.aquarea_settings.setting_data_info.items():
+            if "user" not in key:
                 continue
 
-            # Has /options → button / switch / select (process only the /options topic)
-            options_v = topics.get(state_topic + "/options", "")
-            values = [opt.strip() for opt in options_v.split("\n") if opt.strip()]
-            if not values:
-                continue
+            if key in self.translation:
+                # --- Known setting: use translation.json structure ---
+                translation = self.translation[key]
+                value = None
 
-            if len(values) == 1 and "Request" in values[0]:
-                ha_topic, ha_data = encode_button(label, device_id, state_topic, values[0])
-                config[ha_topic] = ha_data
-                continue
+                if val.type == "basic-text":
+                    value = self.dictionary_web_ui.get(val.text_value, "")
+                elif val.type == "select":
+                    if translation.kind == "basic":
+                        if val.selected_value == "----":
+                            # Idle state for one-shot actions (Sterilization, ForceDefrost)
+                            value = "----"
+                        else:
+                            raw = translation.values.get(val.selected_value, "")
+                            value = self.dictionary_web_ui.get(raw, raw)
+                        options = "\n".join(
+                            self.dictionary_web_ui.get(opt, opt)
+                            for opt in translation.values.values()
+                        )
+                        settings[f"aquarea/{user.gwid}/settings/{translation.name}/options"] = options
+                    elif translation.kind == "placeholder":
+                        i = int(val.selected_value, 0)
+                        if "HolidayMode" not in translation.name:
+                            i -= 128
+                        value = str(int.from_bytes((i & 0xFF).to_bytes(1, "big"), "big", signed=True))
+                elif val.type == "placeholder-text":
+                    value = val.placeholder
 
-            has_on_off = any("Off" in val or "On" in val for val in values)
+                if value is not None:
+                    settings[f"aquarea/{user.gwid}/settings/{translation.name}"] = value
+                    # Always publish a label (priority: API translation > display_name > internal name)
+                    label_code = getattr(translation, "label_code", "")
+                    display_name = getattr(translation, "display_name", "")
+                    if label_code:
+                        label = self.dictionary_web_ui.get(label_code, display_name or translation.name)
+                    else:
+                        label = display_name or translation.name
+                    settings[f"aquarea/{user.gwid}/settings/{translation.name}/label"] = label.strip()
 
-            if len(values) <= 2 and has_on_off:
-                try:
-                    ha_topic, ha_data = encode_switch(label, device_id, state_topic, values)
-                    config[ha_topic] = ha_data
-                except ValueError:
-                    ha_topic, ha_data = encode_select(label, device_id, state_topic, values)
-                    config[ha_topic] = ha_data
             else:
-                ha_topic, ha_data = encode_select(label, device_id, state_topic, values)
-                config[ha_topic] = ha_data
-
-        return config
-
-    def encode_sensors(self, topics: dict[str, str], user: AquareaEndUserJSON) -> dict[str, str]:
-        config: dict[str, str] = {}
-        no_dupes: dict[str, str] = {}
-
-        # De-duplicate: prefer /unit topic when present
-        for k, v in topics.items():
-            if "/log/" not in k and "/state/" not in k:
-                continue
-            if k.endswith("/unit"):
-                no_dupes[k] = v
-            elif f"{k}/unit" not in topics:
-                no_dupes[k] = v
-
-        for k, v in no_dupes.items():
-            parts = k.split("/")
-            if len(parts) < 4:
-                continue
-            name = parts[3]
-            device_id = parts[1]
-
-            is_live = "/state/" in k
-            suffix = "Live" if is_live else "Log"
-            display_name = f"{name} {suffix}"
-
-            clean_name = re.sub(r'[^a-zA-Z0-9_-]', '', name)
-            object_id = f"{clean_name}_{suffix.lower()}"
-
-            try:
-                if k.endswith("/unit"):
-                    unit = v
-                    _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), unit)
-                    component = "sensor"
-                elif name == "Timestamp":
-                    _, ha_data = encode_sensor(display_name, device_id, k, "", "timestamp")
-                    component = "sensor"
-                elif v in ("On", "Off"):
-                    _, ha_data = encode_binary_sensor(display_name, device_id, k)
-                    component = "binary_sensor"
-                else:
-                    unit = UNIT_MAP.get(name, "")
-                    _, ha_data = encode_sensor(display_name, device_id, k, unit)
-                    component = "sensor"
-
-                data_dict = json.loads(ha_data)
-                data_dict["unique_id"] = f"{device_id}_{object_id}"
-                data_dict["name"] = display_name
-
-                ha_topic = f"homeassistant/{component}/{device_id}/{object_id}/config".replace(" ", "")
-                config[ha_topic] = json.dumps(data_dict)
-
-            except Exception as exc:
-                logger.debug(
-                    "Failed to encode discovery for sensor '%s' (device %s, topic %s): %s",
-                    name, device_id, k, exc,
-                )
-
-        return config
+                # --- Unknown setting: passthrough using dictionary_web_ui ---
+                # Works for any heat pump model without changes to translation.json.
+                # We publish the current value translated via the 2010 dictionary.
+                # We cannot generate a select/switch without the full options list,
+                # so this publishes a read-only sensor — better than nothing.
+                if val.selected_value:
+                    internal_name = key.replace("function-setting-user-select-", "setting-")
+                    value = self.dictionary_web_ui.get(val.selected_value, val.selected_value)
+                    settings[f"aquarea/{user.gwid}/settings/{internal_name}"] = value
+                    logger.debug("Passthrough unknown setting %s (%s) = %s", key, internal_name, value)
+        logger.info("Get new Panasonic settings data for device %s", user.gwid)
+        logger.debug(
+            "Panasonic settings data for device %s (%d values): %s",
+            user.gwid,
+            len(settings),
+            json.dumps(settings, ensure_ascii=False),
+        )
+        return settings
