@@ -92,7 +92,10 @@ class Aquarea(
         return await self.get_shiesuahruefutohkun()
 
     async def feed_data_from_aquarea(self):
-        for user in self.users_map.values():
+        # Snapshot the user list before iterating: aquarea_setup() called on
+        # token expiry repopulates users_map, which would raise RuntimeError
+        # ("dictionary changed size during iteration") without this copy.
+        for user in list(self.users_map.values()):
             try:
                 shiesuahruefutohkun = await self.get_end_user_shiesuahruefutohkun(user)
             except Exception as e:
@@ -179,9 +182,13 @@ async def aquarea_handler(
     logger.info("Logged in to Aquarea Service Cloud")
 
     async def poll_loop():
+        loop = asyncio.get_event_loop()
         while not ctx.is_set():
+            next_tick = loop.time() + pool_interval
             await aq.feed_data_from_aquarea()
-            await asyncio.sleep(pool_interval)
+            remaining = next_tick - loop.time()
+            if remaining > 0:
+                await asyncio.sleep(remaining)
 
     async def command_loop():
         while not ctx.is_set():

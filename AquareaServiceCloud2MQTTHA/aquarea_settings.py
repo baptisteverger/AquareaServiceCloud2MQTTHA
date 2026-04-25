@@ -5,14 +5,14 @@ Device settings — equivalent of aquareaDeviceSettings.go
 import json
 import logging
 
-from aquarea_types import AquareaEndUserJSON, AquareaFunctionSettingGetJSON
+from aquarea_types import AquareaCommand, AquareaEndUserJSON, AquareaFunctionSettingGetJSON
 
 logger = logging.getLogger(__name__)
 
 
 class AquareaSettingsMixin:
 
-    async def send_setting(self, cmd: "AquareaCommand") -> None:
+    async def send_setting(self, cmd: AquareaCommand) -> None:
         if cmd.value == "----":
             return
         if not self.aquarea_settings.settings_background_data:
@@ -38,7 +38,14 @@ class AquareaSettingsMixin:
                 value = self.reverse_dictionary_web_ui.get(value, value)
                 value = function_info.reverse_values.get(value, value)
             elif function_info.kind == "placeholder":
-                i = int(value, 0)
+                try:
+                    i = int(value, 0)
+                except (ValueError, OverflowError):
+                    logger.warning(
+                        "Ignoring command for '%s': expected numeric value, got '%s'",
+                        cmd.setting, value,
+                    )
+                    return
                 if "HolidayMode" not in cmd.setting:
                     i += 128
                 value = f"0x{i & 0xFF:X}"

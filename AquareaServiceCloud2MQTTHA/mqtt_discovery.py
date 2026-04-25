@@ -35,6 +35,22 @@ def _load_unit_map(path: str = _TRANSLATION_PATH) -> dict[str, str]:
 
 UNIT_MAP: dict[str, str] = _load_unit_map()
 
+# Maps unit strings (from Panasonic API) to HA sensor device classes.
+# https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes
+_DEVICE_CLASS_MAP: dict[str, str] = {
+    "°C":       "temperature",
+    "kW":       "power",
+    "bar":      "pressure",
+    "kgf/cm2":  "pressure",
+    "Hz":       "frequency",
+    "A":        "current",
+    "%":        "power_factor",
+    "h":        "duration",
+    "sec":      "duration",
+    "L/min":    "volume_flow_rate",
+    # r/min (RPM), Lv (level), duty — no standard HA device class
+}
+
 
 # ---------------------------------------------------------------------------
 # Dataclasses
@@ -139,13 +155,14 @@ def encode_binary_sensor(name: str, device_id: str, state_topic: str) -> tuple[s
     return "", _to_json(s)
 
 
-def encode_sensor(name: str, device_id: str, state_topic: str, unit: str = "") -> tuple[str, str]:
+def encode_sensor(name: str, device_id: str, state_topic: str, unit: str = "", device_class: str = "") -> tuple[str, str]:
     safe = name.replace(" ", "_")
     s = MqttSensor(
         name=name,
         availability_topic="aquarea/status",
         state_topic=state_topic,
         unit_of_measurement=unit,
+        device_class=device_class,
         unique_id=f"{device_id}_{safe}",
         device=_panasonic(device_id),
     )
@@ -298,14 +315,17 @@ class AquareaDiscoveryMixin:
 
             try:
                 if k.endswith("/unit"):
-                    _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), v)
+                    unit = v
+                    dc = _DEVICE_CLASS_MAP.get(unit, "")
+                    _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), unit, dc)
                     component = "sensor"
                 elif v in ("On", "Off"):
                     _, ha_data = encode_binary_sensor(display_name, device_id, k)
                     component = "binary_sensor"
                 else:
                     unit = UNIT_MAP.get(name, "")
-                    _, ha_data = encode_sensor(display_name, device_id, k, unit)
+                    dc = _DEVICE_CLASS_MAP.get(unit, "")
+                    _, ha_data = encode_sensor(display_name, device_id, k, unit, dc)
                     component = "sensor"
 
                 data_dict = json.loads(ha_data)

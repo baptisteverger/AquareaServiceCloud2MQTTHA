@@ -319,7 +319,21 @@ class AquareaLoginMixin:
         raw_items = data.get("logItems", "[]")
         ordered_keys: list[str] = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
 
-        self.log_items = [_parse_log_label(log_labels_2903.get(k, k)) for k in ordered_keys]
+        # Build log_items with deduplication: if two API entries produce the same
+        # sanitized name, the second gets a _2 suffix, the third _3, etc.
+        # Without this, the second item would silently overwrite the first in MQTT.
+        seen_names: dict[str, int] = {}
+        deduped: list[AquareaLogItem] = []
+        for k in ordered_keys:
+            item = _parse_log_label(log_labels_2903.get(k, k))
+            base = item.name
+            count = seen_names.get(base, 0) + 1
+            seen_names[base] = count
+            if count > 1:
+                item = AquareaLogItem(name=f"{base}_{count}", unit=item.unit, values=item.values)
+                logger.debug("Duplicate log item name '%s' → renamed to '%s'", base, item.name)
+            deduped.append(item)
+        self.log_items = deduped
         logger.info("Panasonic loading schema (List available in log debug)")
         logger.debug(
             "Panasonic log schema (functionStatistics): %d items — %s",
