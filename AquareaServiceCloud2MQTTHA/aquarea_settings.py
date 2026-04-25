@@ -20,6 +20,11 @@ class AquareaSettingsMixin:
 
         function_name = self.reverse_translation.get(cmd.setting)
         if not function_name:
+            logger.warning(
+                "Received command for unknown setting '%s' (device %s, value '%s') — "
+                "no matching entry in translation.json, command ignored",
+                cmd.setting, cmd.device_id, cmd.value,
+            )
             return
 
         function_name_post = function_name.replace(

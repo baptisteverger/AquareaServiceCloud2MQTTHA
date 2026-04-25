@@ -18,7 +18,7 @@ from aquarea_types import (
     AquareaFunctionSettingGetJSON,
     AquareaLogItem,
 )
-from aquarea_http import AquareaHTTPMixin, set_language
+from aquarea_http import AquareaHTTPMixin
 from aquarea_login import AquareaLoginMixin
 from aquarea_settings import AquareaSettingsMixin
 from aquarea_device_status import AquareaDeviceStatusMixin
@@ -160,7 +160,7 @@ async def aquarea_handler(
 
     # Set API language — controls labels returned by Panasonic (sensors, settings)
     language = config.get("Language", "en")
-    set_language(language)
+    aq.set_language(language)
     logger.info("API language set to: %s", language)
     aq.data_queue = data_queue
     aq.status_queue = status_queue
@@ -170,12 +170,24 @@ async def aquarea_handler(
     pool_interval = float(config["PoolInterval"])
     timeout_sec = float(config.get("AquareaTimeout", 30))
 
-    ssl_ctx = ssl.create_default_context()
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
+    ssl_verify = config.get("AquareaServiceCloudSSLVerify", True)
+    if ssl_verify:
+        # Default: full certificate verification (recommended)
+        connector = aiohttp.TCPConnector()
+    else:
+        # Escape hatch for self-signed / intercepting proxies — set
+        # AquareaServiceCloudSSLVerify: false in options.json to use.
+        logger.warning(
+            "SSL certificate verification is DISABLED "
+            "(AquareaServiceCloudSSLVerify=false) — use only for debugging"
+        )
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
 
     aq.session = aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(ssl=ssl_ctx),
+        connector=connector,
         timeout=aiohttp.ClientTimeout(total=timeout_sec),
     )
 

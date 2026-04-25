@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 class AquareaDeviceStatusMixin:
 
     async def parse_device_status(
-        self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
+        self, user: AquareaEndUserJSON, shiesuahruefutohkun: str, init: bool = False
     ) -> dict[str, str]:
-        response = await self.get_device_status(user, shiesuahruefutohkun)
+        response = await self.get_device_status(user, shiesuahruefutohkun, init=init)
         device_status: dict[str, str] = {}
 
         for key, val in response.status_data_info.items():
@@ -39,7 +39,7 @@ class AquareaDeviceStatusMixin:
         return device_status
 
     async def get_device_status(
-        self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
+        self, user: AquareaEndUserJSON, shiesuahruefutohkun: str, init: bool = False
     ) -> AquareaStatusResponseJSON:
         base = self.aquarea_service_cloud_url
         ref = base + "installer/functionStatus"
@@ -51,16 +51,20 @@ class AquareaDeviceStatusMixin:
             {"var.functionSelectedGwUid": user.gw_uid},
         )
 
-        await self.http_get_with_referer(base + "page/api/installerState", ref)
-        await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222006%22%5D", ref)
-        await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222999%22%5D", ref)
-        await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222000%22%5D", ref)
-        await self.http_get_with_referer(
-            base + f"page/api/onetrust?shiesuahruefutohkun={shiesuahruefutohkun}", ref
-        )
-        await self.http_get_with_referer(
-            base + f"page/api/userInfo?shiesuahruefutohkun={shiesuahruefutohkun}", ref
-        )
+        # These endpoints return static data (session state, UI text) that does
+        # not change between polls.  Only fetch them on the very first call so
+        # that we don't hammer the Panasonic API on every PoolInterval tick.
+        if init:
+            await self.http_get_with_referer(base + "page/api/installerState", ref)
+            await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222006%22%5D", ref)
+            await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222999%22%5D", ref)
+            await self.http_get_with_referer(base + "page/api/text?var.types=%5B%222000%22%5D", ref)
+            await self.http_get_with_referer(
+                base + f"page/api/onetrust?shiesuahruefutohkun={shiesuahruefutohkun}", ref
+            )
+            await self.http_get_with_referer(
+                base + f"page/api/userInfo?shiesuahruefutohkun={shiesuahruefutohkun}", ref
+            )
 
         b = await self.http_post_with_referer(
             base + "installer/api/function/status",

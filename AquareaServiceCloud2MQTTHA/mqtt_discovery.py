@@ -8,10 +8,13 @@ Settings discovery:
 """
 
 import json
+import logging
 import re
 import os
 from dataclasses import dataclass, field, asdict
 from aquarea_types import AquareaEndUserJSON
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Unit map from translation.json
@@ -312,7 +315,10 @@ class AquareaDiscoveryMixin:
                 ha_topic = f"homeassistant/{component}/{device_id}/{object_id}/config".replace(" ", "")
                 config[ha_topic] = json.dumps(data_dict)
 
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "Failed to encode discovery for sensor '%s' (device %s, topic %s): %s",
+                    name, device_id, k, exc,
+                )
 
         return config

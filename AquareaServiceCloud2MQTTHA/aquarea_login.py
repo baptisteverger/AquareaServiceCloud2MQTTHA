@@ -84,9 +84,10 @@ class AquareaLoginMixin:
             except Exception:
                 continue
 
-            # 1. Status — establishes device session context
+            # 1. Status — establishes device session context (init=True: fetches
+            #    static endpoints that only need to be called once)
             try:
-                status_data = await self.parse_device_status(user, shiesuahruefutohkun)
+                status_data = await self.parse_device_status(user, shiesuahruefutohkun, init=True)
                 if status_data:
                     ha_config_state = self.encode_sensors(status_data, user)
                     if ha_config_state:
@@ -169,6 +170,12 @@ class AquareaLoginMixin:
         end_users_list = AquareaEndUsersListJSON.from_dict(json.loads(b))
         for user in end_users_list.endusers:
             self.users_map[user.gwid] = user
+
+        if not end_users_list.endusers:
+            raise RuntimeError(
+                "No Aquarea devices found on this account. "
+                "Check that at least one heat pump is registered in Aquarea Service Cloud."
+            )
 
         await self.get_dictionary(end_users_list.endusers[0])
         await self.status_queue.put(True)
