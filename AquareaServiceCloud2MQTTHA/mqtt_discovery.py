@@ -319,6 +319,9 @@ class AquareaDiscoveryMixin:
                     dc = _DEVICE_CLASS_MAP.get(unit, "")
                     _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), unit, dc)
                     component = "sensor"
+                elif name == "Timestamp":
+                    _, ha_data = encode_sensor(display_name, device_id, k, "", "timestamp")
+                    component = "sensor"
                 elif v in ("On", "Off"):
                     _, ha_data = encode_binary_sensor(display_name, device_id, k)
                     component = "binary_sensor"

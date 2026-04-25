@@ -5,6 +5,7 @@ Device statistics / log — equivalent of aquareaDeviceStatistics.go
 import json
 import logging
 import time
+from datetime import datetime, timezone
 
 from aquarea_types import AquareaEndUserJSON, AquareaLogDataJSON
 
@@ -73,7 +74,9 @@ class AquareaDeviceStatisticsMixin:
 
             stats[f"aquarea/{user.gwid}/log/{name}"] = str_val
 
-        stats[f"aquarea/{user.gwid}/log/Timestamp"] = str(last_key)
+        ts_sec = int(last_key) / 1000
+        ts_iso = datetime.fromtimestamp(ts_sec, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        stats[f"aquarea/{user.gwid}/log/Timestamp"] = ts_iso
         stats[f"aquarea/{user.gwid}/log/CurrentError"] = str(log_data.error_code)
         logger.info("Get new Panasonic log data for device %s", user.gwid)
         logger.debug(
