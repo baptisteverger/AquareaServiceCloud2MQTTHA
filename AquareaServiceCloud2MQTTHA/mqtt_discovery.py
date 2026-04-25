@@ -35,22 +35,6 @@ def _load_unit_map(path: str = _TRANSLATION_PATH) -> dict[str, str]:
 
 UNIT_MAP: dict[str, str] = _load_unit_map()
 
-# Maps unit strings (from Panasonic API) to HA sensor device classes.
-# https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes
-_DEVICE_CLASS_MAP: dict[str, str] = {
-    "°C":       "temperature",
-    "kW":       "power",
-    "bar":      "pressure",
-    "kgf/cm2":  "pressure",
-    "Hz":       "frequency",
-    "A":        "current",
-    "%":        "power_factor",
-    "h":        "duration",
-    "sec":      "duration",
-    "L/min":    "volume_flow_rate",
-    # r/min (RPM), Lv (level), duty — no standard HA device class
-}
-
 
 # ---------------------------------------------------------------------------
 # Dataclasses
@@ -316,8 +300,7 @@ class AquareaDiscoveryMixin:
             try:
                 if k.endswith("/unit"):
                     unit = v
-                    dc = _DEVICE_CLASS_MAP.get(unit, "")
-                    _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), unit, dc)
+                    _, ha_data = encode_sensor(display_name, device_id, k.removesuffix("/unit"), unit)
                     component = "sensor"
                 elif name == "Timestamp":
                     _, ha_data = encode_sensor(display_name, device_id, k, "", "timestamp")
@@ -327,8 +310,7 @@ class AquareaDiscoveryMixin:
                     component = "binary_sensor"
                 else:
                     unit = UNIT_MAP.get(name, "")
-                    dc = _DEVICE_CLASS_MAP.get(unit, "")
-                    _, ha_data = encode_sensor(display_name, device_id, k, unit, dc)
+                    _, ha_data = encode_sensor(display_name, device_id, k, unit)
                     component = "sensor"
 
                 data_dict = json.loads(ha_data)

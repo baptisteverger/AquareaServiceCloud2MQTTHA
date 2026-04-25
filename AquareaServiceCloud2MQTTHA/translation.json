@@ -59,7 +59,7 @@
   },
   "function-status-text-037": {
     "name": "PumpSpeed",
-    "unit": "rpm"
+    "unit": "r/min"
   },
   "function-status-text-039": {
     "name": "ThreeWayValve"
@@ -118,7 +118,7 @@
   },
   "function-status-text-126": {
     "name": "Zone2PumpSpeed",
-    "unit": "rpm"
+    "unit": "r/min"
   },
   "function-setting-user-select-003": {
     "name": "Operation",
@@ -365,11 +365,11 @@
   },
   "auto-fanmotorspeed1": {
     "name": "FanMotorSpeed1",
-    "unit": "rpm"
+    "unit": "r/min"
   },
   "auto-fanmotorspeed2": {
     "name": "FanMotorSpeed2",
-    "unit": "rpm"
+    "unit": "r/min"
   },
   "auto-heatmodeenergyconsumption": {
     "name": "HeatModeEnergyConsumption",
