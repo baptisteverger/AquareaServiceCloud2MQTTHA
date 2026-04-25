@@ -1,148 +1,158 @@
-# aquarea2mqtt-python
+# AquareaServiceCloud2MQTTHA
 
-Python port of [aquarea2mqtt](https://github.com/rondoval/aquarea2mqtt) by rondoval — connects Panasonic Aquarea heat pumps to Home Assistant via MQTT.
-
-> **Note:** This is a Python port of the original Go project. The logic and structure have been ported from Go to Python, and adapted for use on Windows and other platforms without requiring a Go toolchain.
-
-## How it works
-
-```
-Panasonic Aquarea Cloud ──► aquarea2mqtt-python ──► MQTT broker ──► Home Assistant
-```
-
-The script logs into the Aquarea Service Cloud, polls your device at a configurable interval, and publishes data to MQTT. It supports **Home Assistant MQTT Discovery**, so your Aquarea devices appear automatically in HA without any manual configuration.
+Home Assistant add-on that connects your **Panasonic Aquarea** heat pump to Home Assistant via MQTT, using the [Aquarea Service Cloud](https://aquarea-service.panasonic.com/) API.
 
 ---
 
-## Requirements
+## Features
 
-- Python 3.11+
-- A running MQTT broker (e.g. [Mosquitto](https://mosquitto.org/))
-- A Panasonic Aquarea account (Service Cloud or Smart Cloud)
+- **Real-time status** — inlet/outlet water temperature, mode, pump speed, flow rate, compressor frequency, and more
+- **Full log data** — 81 sensors from the Aquarea diagnostic log (temperatures, pressures, energy, timers…)
+- **Settings control** — switches, selects and buttons for all user-accessible settings (Operation, OperationMode, ForceDHW, QuietMode, TankSensor, Powerful, Sterilization, ForceDefrost…)
+- **Home Assistant MQTT discovery** — entities appear automatically in HA with correct device classes and units
+- **Multi-language** — sensor and setting labels follow the API language (configurable: en, fr, de, es, it, nl, pl…)
+- **100% dynamic** — sensor names, units and binary values come from the Panasonic API at startup, no hardcoded sensor list
+- **Compatible with all Aquarea Gen H/J/K models** — unknown settings are published as read-only sensors (passthrough)
 
 ---
 
 ## Installation
 
-```bash
-git clone https://github.com/YOUR_USERNAME/aquarea2mqtt-python
-cd aquarea2mqtt-python
-pip install -r requirements.txt
-```
+1. In Home Assistant, go to **Settings → Add-ons → Add-on Store**
+2. Click the three-dot menu → **Repositories**
+3. Add: `https://github.com/baptisteverger/AquareaServiceCloud2MQTTHA`
+4. Find **AquareaServiceCloud2MQTTHA** and click **Install**
+
+---
+
+## Prerequisites
+
+- A [Mosquitto MQTT broker](https://github.com/home-assistant/addons/tree/master/mosquitto) (or any MQTT broker)
+- An [Aquarea Service Cloud](https://aquarea-service.panasonic.com/) account linked to your heat pump
+- MQTT integration enabled in Home Assistant
 
 ---
 
 ## Configuration
 
-Copy the example config and fill in your credentials:
+| Parameter | Description | Default |
+|---|---|---|
+| `AquareaServiceCloudURL` | Panasonic API base URL | `https://aquarea-service.panasonic.com/` |
+| `AquareaServiceCloudLogin` | Your Aquarea Service Cloud email | *(required)* |
+| `AquareaServiceCloudPassword` | Your Aquarea Service Cloud password | *(required)* |
+| `AquareaTimeout` | HTTP request timeout in seconds | `30` |
+| `PoolInterval` | Polling interval in seconds | `60` |
+| `LogSecOffset` | How many seconds back to fetch log data | `3600` |
+| `MqttServer` | MQTT broker hostname or IP | *(required)* |
+| `MqttPort` | MQTT broker port | `1883` |
+| `MqttLogin` | MQTT username (leave empty if none) | `` |
+| `MqttPass` | MQTT password (leave empty if none) | `` |
+| `MqttClientID` | MQTT client identifier | `aquarea` |
+| `MqttKeepalive` | MQTT keepalive in seconds | `60` |
+| `Language` | Label language for sensor/setting names | `en` |
+| `LogLevel` | Logging verbosity: `DEBUG`, `INFO`, `WARNING` | `INFO` |
 
-```bash
-cp options.example.json options.json
+### Language codes
+
+`en` · `fr` · `de` · `es` · `it` · `nl` · `pl` · `pt` · `cs` · `sv` · `fi` · `nb` · `da` · `el` · `ro` · `sk` · `sl` · `hr` · `bg` · `hu` · `tr`
+
+> **Note:** changing the language after initial setup will rename entities in HA. Delete the old entities from the MQTT integration before restarting.
+
+---
+
+## MQTT Topics
+
+All topics are prefixed with `aquarea/{device_id}/`.
+
+### Status (live)
+```
+aquarea/{device_id}/state/{SensorName}        → current value
 ```
 
-Edit `options.json`:
-
-```json
-{
-  "AquareaServiceCloudURL": "https://aquarea-smart.panasonic.com/",
-  "AquareaServiceCloudLogin": "your@email.com",
-  "AquareaServiceCloudPassword": "yourpassword",
-  "AquareaTimeout": "30",
-  "PoolInterval": "60",
-  "LogSecOffset": 3600,
-  "MqttServer": "192.168.1.100",
-  "MqttPort": 1883,
-  "MqttLogin": "",
-  "MqttPass": "",
-  "MqttClientID": "aquarea",
-  "MqttKeepalive": "60"
-}
+### Log (historical, from last log entry)
+```
+aquarea/{device_id}/log/{SensorName}          → value
+aquarea/{device_id}/log/{SensorName}/unit     → unit (°C, kW, Hz…)
+aquarea/{device_id}/log/Timestamp             → Unix timestamp ms
+aquarea/{device_id}/log/CurrentError          → error code
 ```
 
-| Key | Description |
-|-----|-------------|
-| `AquareaServiceCloudURL` | Aquarea portal URL — use `https://aquarea-smart.panasonic.com/` for Smart Cloud or `https://aquarea-service.panasonic.com/` for Service Cloud |
-| `AquareaServiceCloudLogin` | Your Aquarea account email |
-| `AquareaServiceCloudPassword` | Your Aquarea account password |
-| `AquareaTimeout` | HTTP timeout in seconds |
-| `PoolInterval` | Polling interval in seconds |
-| `LogSecOffset` | How far back (in seconds) to fetch log data |
-| `MqttServer` | IP or hostname of your MQTT broker |
-| `MqttPort` | MQTT port (default: `1883`) |
-| `MqttLogin` | MQTT username (leave empty if not required) |
-| `MqttPass` | MQTT password (leave empty if not required) |
-| `MqttClientID` | MQTT client identifier |
-| `MqttKeepalive` | MQTT keepalive in seconds |
+### Settings (read/write)
+```
+aquarea/{device_id}/settings/{SettingName}           → current value
+aquarea/{device_id}/settings/{SettingName}/options   → available options (newline-separated)
+aquarea/{device_id}/settings/{SettingName}/label     → display name
+aquarea/{device_id}/settings/{SettingName}/set       → write topic (send new value here)
+```
 
-> ⚠️ Never commit `options.json` — it contains your credentials. It is listed in `.gitignore`.
+### HA Discovery
+```
+homeassistant/sensor/{device_id}/{name}/config
+homeassistant/binary_sensor/{device_id}/{name}/config
+homeassistant/switch/{device_id}/{name}/config
+homeassistant/select/{device_id}/{name}/config
+homeassistant/button/{device_id}/{name}/config
+```
 
----
-
-## Running
-
-```bash
-# Linux / macOS
-python main.py
-
-# Windows
-py main.py
+### Availability
+```
+aquarea/status    → "online" / "offline"
 ```
 
 ---
 
-## Home Assistant integration
+## Entities created in Home Assistant
 
-1. In Home Assistant, install the **Mosquitto broker** add-on
-   (Settings → Add-ons → Add-on store → Mosquitto broker)
-2. Enable the **MQTT integration**
-   (Settings → Devices & services → MQTT — HA will suggest it automatically)
-3. Set `MqttServer` in `options.json` to your Home Assistant IP address
-4. Run the script — your Aquarea devices will appear automatically in HA
+### Controls (settings)
 
----
+| Entity | Type | Description |
+|---|---|---|
+| Operation | Switch | Turn heat pump on/off |
+| Operation mode | Select | Tank / Heat / Cool / Auto / … |
+| Zone operation setting | Select | Zone1/Zone2 on/off combinations |
+| Force DHW | Switch | Force domestic hot water |
+| Weekly timer | Switch | Enable/disable weekly schedule |
+| Holiday mode | Switch | Activate holiday mode |
+| Quiet timer | Switch | Enable quiet timer |
+| Quiet mode | Select | Off / Level 1 / Level 2 / Level 3 |
+| Priority | Select | Sound / Capacity |
+| Room heater | Switch | Enable room heater |
+| Tank heater | Switch | Enable tank heater |
+| Tank sensor | Select | Top / Center |
+| Powerful | Select | Off / 30 min / 60 min / 90 min |
+| Force heater | Switch | Force backup heater |
+| Sterilization | Button | Request sterilization |
+| Force defrost | Button | Request manual defrost |
+| Zone 1/2 target temperature (heat/cool) | Number | Target water temperature |
+| Tank target temperature | Number | DHW target temperature |
+| Holiday mode heat/tank shift temp | Number | Temperature offset during holiday |
 
-## MQTT topics
+### Sensors (live + log)
 
-| Topic | Description |
-|-------|-------------|
-| `aquarea/status` | `online` / `offline` |
-| `aquarea/{gwid}/state/{name}` | Device state values |
-| `aquarea/{gwid}/settings/{name}` | Current setting values |
-| `aquarea/{gwid}/settings/{name}/set` | Change a setting (publish here) |
-| `aquarea/{gwid}/log/{name}` | Statistics / log values |
-| `aquarea/{gwid}/log/{name}/unit` | Unit of the statistic |
-
----
-
-## File structure
-
-| File | Description |
-|------|-------------|
-| `main.py` | Entry point |
-| `aquarea.py` | Main class, assembles all modules |
-| `aquarea_types.py` | Data types and JSON mappings |
-| `aquarea_http.py` | HTTP helpers |
-| `aquarea_login.py` | Login, dictionary and log item loading |
-| `aquarea_settings.py` | Read and write device settings |
-| `aquarea_device_status.py` | Device status polling |
-| `aquarea_device_statistics.py` | Device log / statistics |
-| `mqtt.py` | MQTT handler |
-| `mqtt_discovery.py` | Home Assistant MQTT discovery payloads |
-| `translation.json` | Aquarea function name mappings |
-| `options.example.json` | Configuration template |
+Over **115 entities** covering temperatures, pressures, energy consumption/generation, pump data, compressor metrics, binary statuses and more. All names, units and translated values come directly from the Panasonic API.
 
 ---
 
-## Based on
+## Troubleshooting
 
-Python port of **[aquarea2mqtt](https://github.com/rondoval/aquarea2mqtt)** by [rondoval](https://github.com/rondoval), itself forked from [lsochanowski/Aquarea2mqtt](https://github.com/lsochanowski/Aquarea2mqtt).
+**No entities appear in HA**
+- Check the MQTT broker is reachable and credentials are correct
+- Enable MQTT discovery in the HA MQTT integration
+- Check the add-on logs for errors
 
-The logic, structure, and `translation.json` have been ported from Go to Python. All credit for the original reverse-engineering work and API knowledge goes to the original authors.
+**Settings show raw codes (e.g. `2010-00E1`)**
+- The type-2010 dictionary failed to load; the add-on uses a built-in English fallback
+- Check network connectivity to `aquarea-service.panasonic.com`
+
+**Some sensors show `Unknown` or `-78 °C`**
+- These are sensors for optional equipment not installed on your unit (Zone 2, buffer tank, solar, pool, bivalent)
+- Values are published as-is from Panasonic — `-78`, `-31`, `-46` are sentinel values for unconnected physical sensors
+
+**Changing `Language` breaks entity names**
+- Delete the existing Aquarea device from the MQTT integration in HA, then restart the add-on
 
 ---
 
-## License
+## Credits
 
-GPL-3.0 — see [LICENSE](LICENSE).
-
-This project is a derivative work of aquarea2mqtt (GPL-3.0) and is distributed under the same license.
+- Original Go implementation: [kamaradclimber/Aquarea2mqtt](https://github.com/kamaradclimber/Aquarea2mqtt)
