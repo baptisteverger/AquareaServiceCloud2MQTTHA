@@ -26,7 +26,8 @@ class AquareaDeviceStatisticsMixin:
         self, user: AquareaEndUserJSON, shiesuahruefutohkun: str
     ) -> dict[str, str] | None:
 
-        n = len(self.log_items)
+        device_log_items = self.log_items.get(user.gwid, [])
+        n = len(device_log_items)
         if n:
             value_list = json.dumps({"logItems": list(range(n))})
         else:
@@ -58,8 +59,8 @@ class AquareaDeviceStatisticsMixin:
         stats: dict[str, str] = {}
 
         for i, val in enumerate(device_log[last_key]):
-            if i < len(self.log_items):
-                item = self.log_items[i]
+            if i < len(device_log_items):
+                item = device_log_items[i]
                 name = item.name
                 if item.unit:
                     stats[f"aquarea/{user.gwid}/log/{name}/unit"] = item.unit

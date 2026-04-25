@@ -96,10 +96,12 @@ class AquareaLoginMixin:
             except Exception as e:
                 logger.error("Initial status fetch failed for device %s: %s", user.gwid, e)
 
-            # 2. Log items schema — needs device context from step 1
-            if not self.log_items:
+            # 2. Log items schema — needs device context from step 1.
+            #    Each device may have a different model with a different log schema,
+            #    so we fetch and store it independently per gwid.
+            if user.gwid not in self.log_items:
                 try:
-                    await self.fetch_log_items(shiesuahruefutohkun, self._log_labels_2903)
+                    await self.fetch_log_items(user.gwid, shiesuahruefutohkun, self._log_labels_2903)
                 except Exception as e:
                     logger.error("fetch_log_items failed for device %s: %s", user.gwid, e)
 
@@ -298,11 +300,13 @@ class AquareaLoginMixin:
 
         self.reverse_dictionary_web_ui = {v: k for k, v in self.dictionary_web_ui.items()}
 
-    async def fetch_log_items(self, token: str, log_labels_2903: dict[str, str]):
+    async def fetch_log_items(self, gwid: str, token: str, log_labels_2903: dict[str, str]) -> None:
         """
         Appelle /page/api/functionStatistics pour obtenir la liste ordonnée
         des clés 2903-xxxx. Position i dans la liste = indice i dans logData.
         Doit être appelé APRÈS parse_device_status (contexte device requis).
+        Stocke le résultat dans self.log_items[gwid] — chaque device a son propre
+        schéma de log car les modèles peuvent différer.
         """
         base = self.aquarea_service_cloud_url
         ref = base + "installer/functionStatus"
@@ -321,25 +325,25 @@ class AquareaLoginMixin:
 
         # Build log_items with deduplication: if two API entries produce the same
         # sanitized name, the second gets a _2 suffix, the third _3, etc.
-        # Without this, the second item would silently overwrite the first in MQTT.
         seen_names: dict[str, int] = {}
         deduped: list[AquareaLogItem] = []
         for k in ordered_keys:
             item = _parse_log_label(log_labels_2903.get(k, k))
-            base = item.name
-            count = seen_names.get(base, 0) + 1
-            seen_names[base] = count
+            base_name = item.name
+            count = seen_names.get(base_name, 0) + 1
+            seen_names[base_name] = count
             if count > 1:
-                item = AquareaLogItem(name=f"{base}_{count}", unit=item.unit, values=item.values)
-                logger.debug("Duplicate log item name '%s' → renamed to '%s'", base, item.name)
+                item = AquareaLogItem(name=f"{base_name}_{count}", unit=item.unit, values=item.values)
+                logger.debug("Duplicate log item name '%s' → renamed to '%s'", base_name, item.name)
             deduped.append(item)
-        self.log_items = deduped
-        logger.info("Panasonic loading schema (List available in log debug)")
+
+        self.log_items[gwid] = deduped
+        logger.info("Panasonic loading schema for device %s (%d items)", gwid, len(deduped))
         logger.debug(
-            "Panasonic log schema (functionStatistics): %d items — %s",
-            len(self.log_items),
+            "Panasonic log schema (functionStatistics) device %s: %s",
+            gwid,
             ", ".join(
                 f"{item.name}{'['+item.unit+']' if item.unit else ''}"
-                for item in self.log_items
+                for item in deduped
             ),
         )
