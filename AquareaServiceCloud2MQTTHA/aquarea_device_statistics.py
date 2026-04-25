@@ -11,7 +11,7 @@ from aquarea_types import AquareaEndUserJSON, AquareaLogDataJSON
 logger = logging.getLogger(__name__)
 
 
-def _format_val(val) -> str:
+def _format_val(val: int | float) -> str:
     """Format a numeric value avoiding float precision artifacts."""
     if isinstance(val, float) and val == int(val):
         return str(int(val))

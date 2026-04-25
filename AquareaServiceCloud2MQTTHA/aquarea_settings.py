@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class AquareaSettingsMixin:
 
-    async def send_setting(self, cmd) -> None:
+    async def send_setting(self, cmd: "AquareaCommand") -> None:
         if cmd.value == "----":
             return
         if not self.aquarea_settings.settings_background_data:

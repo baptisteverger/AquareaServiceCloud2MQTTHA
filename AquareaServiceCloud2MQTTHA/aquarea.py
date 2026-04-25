@@ -91,24 +91,6 @@ class Aquarea(
         """Return cached token."""
         return await self.get_shiesuahruefutohkun()
 
-    @staticmethod
-    def extract_shiesuahruefutohkun(body: bytes) -> str:
-        """Legacy method kept for compatibility."""
-        try:
-            data = json.loads(body)
-            token = data.get("shiesuahruefutohkun")
-            if token:
-                return token
-        except Exception:
-            pass
-        match = re.search(
-            r"const shiesuahruefutohkun = '(.+)'",
-            body.decode("utf-8", errors="replace"),
-        )
-        if match:
-            return match.group(1)
-        raise ValueError("Could not extract shiesuahruefutohkun")
-
     async def feed_data_from_aquarea(self):
         for user in self.users_map.values():
             try:

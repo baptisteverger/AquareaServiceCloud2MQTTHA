@@ -320,7 +320,7 @@ class AquareaLoginMixin:
         ordered_keys: list[str] = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
 
         self.log_items = [_parse_log_label(log_labels_2903.get(k, k)) for k in ordered_keys]
-        logger.info("Panasonic loading schema (List available in log debug)");
+        logger.info("Panasonic loading schema (List available in log debug)")
         logger.debug(
             "Panasonic log schema (functionStatistics): %d items — %s",
             len(self.log_items),
@@ -329,18 +329,3 @@ class AquareaLoginMixin:
                 for item in self.log_items
             ),
         )
-
-    # ------------------------------------------------------------------
-    # Legacy — kept for reference, no longer called
-    # ------------------------------------------------------------------
-
-    def extract_dictionary(self, body: bytes):
-        match = re.search(
-            r"const jsonMessage = eval\('\((.+)\)'", body.decode("utf-8", errors="replace")
-        )
-        if match:
-            result = match.group(1).replace("\\", "")
-            self.dictionary_web_ui.update(json.loads(result))
-
-    def extract_log_items(self, body: bytes):
-        pass
