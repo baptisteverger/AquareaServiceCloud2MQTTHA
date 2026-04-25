@@ -75,8 +75,12 @@ class AquareaLoginMixin:
           1. parse_device_status  — navigates to functionStatus, establishes
                                     device context in the server session.
           2. fetch_log_items      — needs valid session with selected device.
-          3. get_device_settings  — also needs device context.
-          4. get_device_log_information — uses log_items built in step 2.
+          3. get_device_settings  — also needs device context. Populates
+                                    aquarea_settings with settingDataInfo and
+                                    settingBackgroundData.
+          4. fetch_placeholder_ranges — uses settingDataInfo/bgData to compute
+                                    correct min/max/step via R()/D() statusNo logic.
+          5. get_device_log_information — uses log_items built in step 2.
         """
         for user in self.users_map.values():
             try:
@@ -108,6 +112,8 @@ class AquareaLoginMixin:
             # 3. Settings
             try:
                 settings = await self.get_device_settings(user, shiesuahruefutohkun)
+                # 3b. Compute real placeholder ranges from settingDataInfo/bgData
+                await self.fetch_placeholder_ranges()
                 ha_config = self.encode_switches(settings, user)
                 if ha_config:
                     await self.data_queue.put(ha_config)

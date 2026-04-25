@@ -21,6 +21,10 @@ class AquareaCommand:
 class AquareaFunctionDescription:
     name: str = ""
     kind: str = ""
+    unit: str = ""
+    min: float = -128
+    max: float = 127
+    step: float = 1
     values: dict[str, str] = field(default_factory=dict)
     reverse_values: dict[str, str] = field(default_factory=dict)
     label_code: str = ""    # 2010-xxxx code whose translation gives the HA entity name
@@ -36,6 +40,10 @@ class AquareaFunctionDescription:
         return cls(
             name=d.get("name", ""),
             kind=d.get("kind", ""),
+            unit=d.get("unit", ""),
+            min=d.get("min", -128),
+            max=d.get("max", 127),
+            step=d.get("step", 1),
             values=values,
             reverse_values={v: k for k, v in values.items()},
             label_code=d.get("label_code", ""),
@@ -202,15 +210,18 @@ class SettingDataItem:
 class AquareaFunctionSettingGetJSON:
     setting_data_info: dict[str, SettingDataItem] = field(default_factory=dict)
     settings_background_data: dict[str, dict] = field(default_factory=dict)
+    raw_setting_data_info: dict[str, dict] = field(default_factory=dict)
     error_code: int = 0
 
     @classmethod
     def from_dict(cls, d: dict) -> "AquareaFunctionSettingGetJSON":
+        raw = d.get("settingDataInfo", {})
         return cls(
             setting_data_info={
                 k: SettingDataItem.from_dict(v)
-                for k, v in d.get("settingDataInfo", {}).items()
+                for k, v in raw.items()
             },
             settings_background_data=d.get("settingBackgroundData", {}),
+            raw_setting_data_info=raw,
             error_code=d.get("errorCode", 0),
         )
