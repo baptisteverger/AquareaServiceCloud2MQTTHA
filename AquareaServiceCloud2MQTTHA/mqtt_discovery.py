@@ -92,6 +92,17 @@ class MqttButton:
     device: _Device = field(default_factory=_Device)
 
 @dataclass
+class MqttNumber:
+    """HA MQTT number — for writable numeric settings (temperatures, shifts)."""
+    name: str = ""
+    availability_topic: str = ""
+    state_topic: str = ""
+    command_topic: str = ""
+    unit_of_measurement: str = ""
+    unique_id: str = ""
+    device: _Device = field(default_factory=_Device)
+
+@dataclass
 class MqttSensor:
     name: str = ""
     availability_topic: str = ""
@@ -213,6 +224,22 @@ def encode_button(name: str, device_id: str, state_topic: str, payload: str) -> 
     return ha_topic, _to_json(b)
 
 
+def encode_number(name: str, device_id: str, state_topic: str, unit: str = "") -> tuple[str, str]:
+    """Writable numeric setting (temperatures, shift values)."""
+    safe = name.replace(" ", "_")
+    n = MqttNumber(
+        name=name,
+        availability_topic="aquarea/status",
+        state_topic=state_topic,
+        command_topic=state_topic + "/set",
+        unit_of_measurement=unit,
+        unique_id=f"{device_id}_{safe}",
+        device=_panasonic(device_id),
+    )
+    ha_topic = f"homeassistant/number/{device_id}/{safe}/config"
+    return ha_topic, _to_json(n)
+
+
 # ---------------------------------------------------------------------------
 # Main mixin
 # ---------------------------------------------------------------------------
@@ -226,12 +253,23 @@ class AquareaDiscoveryMixin:
         Routing:
           - single "Request" option          → button
           - ≤2 options with On/Off/Request   → switch
-          - everything else                  → select
+          - everything else with options     → select
+          - no options + numeric value       → number
         """
         config: dict[str, str] = {}
 
+        # Collect settings that have /options (button/switch/select)
+        settings_with_options: set[str] = set()
+        for k in topics:
+            if "/settings/" in k and k.endswith("/options"):
+                parts = k.split("/")
+                if len(parts) >= 4:
+                    settings_with_options.add(parts[3])
+
         for k, v in topics.items():
-            if "/settings/" not in k or not k.endswith("/options"):
+            if "/settings/" not in k:
+                continue
+            if k.endswith("/options") or k.endswith("/label"):
                 continue
 
             parts = k.split("/")
@@ -240,16 +278,29 @@ class AquareaDiscoveryMixin:
 
             device_id = parts[1]
             name = parts[3]
-            state_topic = k.removesuffix("/options")
-
-            # Use translated label from account language if published, else internal name
+            state_topic = k
             label = topics.get(state_topic + "/label", name)
 
-            values = [opt.strip() for opt in v.split("\n") if opt.strip()]
+            # No /options → number if value is numeric
+            if name not in settings_with_options:
+                try:
+                    float(v)
+                except (ValueError, TypeError):
+                    continue
+                tr_entry = next(
+                    (e for e in self.translation.values() if e.name == name), None
+                )
+                unit = tr_entry.unit if tr_entry and hasattr(tr_entry, "unit") and tr_entry.unit else ""
+                ha_topic, ha_data = encode_number(label, device_id, state_topic, unit)
+                config[ha_topic] = ha_data
+                continue
+
+            # Has /options → button / switch / select (process only the /options topic)
+            options_v = topics.get(state_topic + "/options", "")
+            values = [opt.strip() for opt in options_v.split("\n") if opt.strip()]
             if not values:
                 continue
 
-            # Single "Request" → button
             if len(values) == 1 and "Request" in values[0]:
                 ha_topic, ha_data = encode_button(label, device_id, state_topic, values[0])
                 config[ha_topic] = ha_data
