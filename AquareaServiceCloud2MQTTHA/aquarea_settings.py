@@ -91,21 +91,24 @@ class AquareaSettingsMixin:
         self.aquarea_settings = AquareaFunctionSettingGetJSON.from_dict(json.loads(b))
         settings: dict[str, str] = {}
 
-        # Compute correct min/max/step for placeholder settings from device config
-        ranges = compute_placeholder_ranges(
-            self.aquarea_settings.raw_setting_data_info,
-            self.aquarea_settings.settings_background_data,
-        )
-        for tr_key, r in ranges.items():
-            entry = self.translation.get(tr_key)
-            if entry and entry.kind == "placeholder":
-                entry.min = r.min
-                entry.max = r.max
-                entry.step = r.step
-                logger.debug(
-                    "Placeholder range %s (%s): min=%s, max=%s, step=%s",
-                    tr_key, entry.name, r.min, r.max, r.step,
-                )
+        # Compute correct min/max/step for placeholder settings from device config.
+        # Only done once per device — hardware config doesn't change between polls.
+        if user.gwid not in self._placeholder_ranges_applied:
+            ranges = compute_placeholder_ranges(
+                self.aquarea_settings.raw_setting_data_info,
+                self.aquarea_settings.settings_background_data,
+            )
+            for tr_key, r in ranges.items():
+                entry = self.translation.get(tr_key)
+                if entry and entry.kind == "placeholder":
+                    entry.min = r.min
+                    entry.max = r.max
+                    entry.step = r.step
+                    logger.debug(
+                        "Placeholder range %s (%s): min=%s, max=%s, step=%s",
+                        tr_key, entry.name, r.min, r.max, r.step,
+                    )
+            self._placeholder_ranges_applied.add(user.gwid)
 
 
         # Log params{} of each setting — helps understand if options can be made dynamic
