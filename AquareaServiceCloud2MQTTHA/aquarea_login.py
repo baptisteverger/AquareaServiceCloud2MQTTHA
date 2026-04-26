@@ -111,6 +111,8 @@ class AquareaLoginMixin:
 
             # 3. Settings (also computes placeholder ranges internally)
             try:
+                # Load option ranges from Panasonic JS on first call (once per process)
+                await self.load_placeholder_options_from_js()
                 settings = await self.get_device_settings(user, shiesuahruefutohkun)
                 ha_config = self.encode_switches(settings, user)
                 if ha_config:

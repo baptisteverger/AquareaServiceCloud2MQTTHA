@@ -4,13 +4,54 @@ Device settings — equivalent of aquareaDeviceSettings.go
 
 import json
 import logging
+import re
 
 from aquarea_types import AquareaCommand, AquareaEndUserJSON, AquareaFunctionSettingGetJSON
-from aquarea_placeholder_ranges import compute_placeholder_ranges
+from aquarea_placeholder_ranges import compute_placeholder_ranges, load_from_js
 
 logger = logging.getLogger(__name__)
 
+_JS_OPTIONS_LOADED = False  # load once per process lifetime
+
+
 class AquareaSettingsMixin:
+
+    async def load_placeholder_options_from_js(self) -> None:
+        """
+        Fetch the Panasonic settings JS bundle and extract all placeholder
+        option ranges dynamically (supports any future model/statusNo).
+
+        Flow: GET /installer/functionSetting HTML → extract JS URL → GET JS → parse.
+        Falls back to hardcoded values if anything fails.
+        Called once at startup.
+        """
+        global _JS_OPTIONS_LOADED
+        if _JS_OPTIONS_LOADED:
+            return
+
+        base = self.aquarea_service_cloud_url
+        try:
+            html = (await self.http_get_html(base + "installer/functionSetting")).decode(
+                "utf-8", errors="replace"
+            )
+            m = re.search(r'src="(/statics[^"]+function-setting[^"]+\.js)"', html)
+            if not m:
+                logger.warning("Could not find settings JS URL in HTML — using fallback ranges")
+                return
+
+            js_url = "https://aquarea-service.panasonic.com" + m.group(1)
+            logger.info("Loading placeholder option ranges from %s", js_url)
+            js_bytes = await self.http_get(js_url)
+            js = js_bytes.decode("utf-8", errors="replace")
+
+            if load_from_js(js):
+                _JS_OPTIONS_LOADED = True
+            else:
+                logger.warning("JS parse failed — using fallback ranges")
+
+        except Exception as exc:
+            logger.warning("load_placeholder_options_from_js failed (%s) — using fallback", exc)
+
 
 
 
