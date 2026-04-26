@@ -99,6 +99,9 @@ class MqttNumber:
     state_topic: str = ""
     command_topic: str = ""
     unit_of_measurement: str = ""
+    min: float = -128
+    max: float = 127
+    step: float = 1
     unique_id: str = ""
     device: _Device = field(default_factory=_Device)
 
@@ -224,16 +227,22 @@ def encode_button(name: str, device_id: str, state_topic: str, payload: str) -> 
     return ha_topic, _to_json(b)
 
 
-def encode_number(name: str, device_id: str, state_topic: str, unit: str = "") -> tuple[str, str]:
+def encode_number(name: str, device_id: str, state_topic: str, unit: str = "",
+                  min_val: float = -128, max_val: float = 127, step: float = 1) -> tuple[str, str]:
     """Writable numeric setting (temperatures, shift values)."""
     safe = name.replace(" ", "_")
+    # Include min/max in unique_id so HA recreates the entity if limits change
+    unique_id = f"{device_id}_{safe}_{int(min_val)}_{int(max_val)}"
     n = MqttNumber(
         name=name,
         availability_topic="aquarea/status",
         state_topic=state_topic,
         command_topic=state_topic + "/set",
         unit_of_measurement=unit,
-        unique_id=f"{device_id}_{safe}",
+        min=min_val,
+        max=max_val,
+        step=step,
+        unique_id=unique_id,
         device=_panasonic(device_id),
     )
     ha_topic = f"homeassistant/number/{device_id}/{safe}/config"
@@ -290,8 +299,11 @@ class AquareaDiscoveryMixin:
                 tr_entry = next(
                     (e for e in self.translation.values() if e.name == name), None
                 )
-                unit = tr_entry.unit if tr_entry and hasattr(tr_entry, "unit") and tr_entry.unit else ""
-                ha_topic, ha_data = encode_number(label, device_id, state_topic, unit)
+                unit = tr_entry.unit if tr_entry else ""
+                min_val = tr_entry.min if tr_entry else -128
+                max_val = tr_entry.max if tr_entry else 127
+                step = tr_entry.step if tr_entry else 1
+                ha_topic, ha_data = encode_number(label, device_id, state_topic, unit, min_val, max_val, step)
                 config[ha_topic] = ha_data
                 continue
 
