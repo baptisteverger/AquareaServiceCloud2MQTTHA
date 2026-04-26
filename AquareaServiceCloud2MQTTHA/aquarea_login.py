@@ -109,11 +109,9 @@ class AquareaLoginMixin:
                 except Exception as e:
                     logger.error("fetch_log_items failed for device %s: %s", user.gwid, e)
 
-            # 3. Settings
+            # 3. Settings (also computes placeholder ranges internally)
             try:
                 settings = await self.get_device_settings(user, shiesuahruefutohkun)
-                # 3b. Compute real placeholder ranges from settingDataInfo/bgData
-                await self.fetch_placeholder_ranges()
                 ha_config = self.encode_switches(settings, user)
                 if ha_config:
                     await self.data_queue.put(ha_config)

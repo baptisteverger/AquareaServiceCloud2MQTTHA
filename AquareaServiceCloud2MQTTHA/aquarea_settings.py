@@ -12,39 +12,6 @@ logger = logging.getLogger(__name__)
 
 class AquareaSettingsMixin:
 
-    async def fetch_placeholder_ranges(self) -> None:
-        """
-        Compute the correct min/max/step for all placeholder (numeric) user
-        settings from the device's settingDataInfo and settingBackgroundData.
-
-        Uses compute_placeholder_ranges() which implements Panasonic's client-side
-        R()/D() statusNo logic — fully dynamic, no hardcoded values, works for
-        any Aquarea model.
-
-        Called once per session before the first get_device_settings() call.
-        Results are applied to self.translation so encode_number() picks them up.
-        """
-        if not self.aquarea_settings.raw_setting_data_info:
-            logger.debug("fetch_placeholder_ranges: no settingDataInfo yet, skipping")
-            return
-
-        ranges = compute_placeholder_ranges(
-            self.aquarea_settings.raw_setting_data_info,
-            self.aquarea_settings.settings_background_data,
-        )
-        for tr_key, r in ranges.items():
-            entry = self.translation.get(tr_key)
-            if entry and entry.kind == "placeholder":
-                entry.min = r.min
-                entry.max = r.max
-                entry.step = r.step
-                logger.debug(
-                    "Placeholder range %s (%s): min=%s, max=%s, step=%s",
-                    tr_key, entry.name, r.min, r.max, r.step,
-                )
-
-    def _apply_placeholder_ranges(self, ranges: dict) -> None:
-        pass  # kept for compatibility, no longer used
 
 
     async def send_setting(self, cmd: AquareaCommand) -> None:
@@ -124,10 +91,21 @@ class AquareaSettingsMixin:
         self.aquarea_settings = AquareaFunctionSettingGetJSON.from_dict(json.loads(b))
         settings: dict[str, str] = {}
 
-        # Now that we have system config data, compute the correct min/max/step
-        # for each placeholder setting (varies per model/installer config).
-        if _PLACEHOLDER_RANGES:
-            self._apply_placeholder_ranges(_PLACEHOLDER_RANGES)
+        # Compute correct min/max/step for placeholder settings from device config
+        ranges = compute_placeholder_ranges(
+            self.aquarea_settings.raw_setting_data_info,
+            self.aquarea_settings.settings_background_data,
+        )
+        for tr_key, r in ranges.items():
+            entry = self.translation.get(tr_key)
+            if entry and entry.kind == "placeholder":
+                entry.min = r.min
+                entry.max = r.max
+                entry.step = r.step
+                logger.debug(
+                    "Placeholder range %s (%s): min=%s, max=%s, step=%s",
+                    tr_key, entry.name, r.min, r.max, r.step,
+                )
 
 
         # Log params{} of each setting — helps understand if options can be made dynamic
